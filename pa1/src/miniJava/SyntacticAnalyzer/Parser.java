@@ -2,8 +2,6 @@ package miniJava.SyntacticAnalyzer;
 
 import miniJava.ErrorReporter;
 
-import java.beans.Visibility;
-
 public class Parser {
 	private Scanner scanner;
 	private ErrorReporter errors;
