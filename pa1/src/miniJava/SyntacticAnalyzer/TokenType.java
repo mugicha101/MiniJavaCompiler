@@ -15,14 +15,14 @@ package miniJava.SyntacticAnalyzer;
 //   to differentiate between them.
 public enum TokenType {
     If, Else, For, While, Do, Switch, // control flow
-    Public, Private, Protected, Default, // class visibility
+    Visibility, // visibility
     Class, Static, This, Return, New, // other class/func tokens
     Identifier, // names
-    Plus, Minus, Star, FSlash, // arithmetic operators
-    Equals, // assignment operators
-    DoubleEquals, NotEquals, LessThan, GreaterThan, LessOrEquals, GreaterOrEquals, // relational operators
-    And, Or, Caret, Tilde, // bitwise operators
-    DoubleAnd, DoubleOr, Not, // logical operators
+    ArithmeticBinOp, Minus, // arithmetic operators (minus is both binary and unary depending on contex)
+    AssignmentOp, // assignment operators
+    RelationalBinOp, // relational operators
+    BitwiseUnOp, BitwiseBinOp, // bitwise operators
+    LogicalBinOp, LogicalUnOp, // logical operators
     VoidType, BooleanType, ByteType, CharType, IntType, LongType, FloatType, DoubleType, // primitive types
     BooleanLiteral, ByteLiteral, CharLiteral, IntLiteral, LongLiteral, FloatLiteral, DoubleLiteral, StringLiteral, // literals
     LCurly, RCurly, LParen, RParen, LBracket, RBracket, // parenthesis family

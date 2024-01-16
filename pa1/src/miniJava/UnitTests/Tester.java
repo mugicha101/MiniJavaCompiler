@@ -58,7 +58,7 @@ public class Tester {
                 if (output.equals(expected)) {
                     System.out.println(String.format("test %s passed", entry.getKey()));
                 } else {
-                    System.out.println(String.format("test %s failed", entry.getKey()));
+                    System.err.println(String.format("test %s failed", entry.getKey()));
                     File errFile = new File(args[0] + "/failed_test_outputs/" + entry.getKey() + ".txt");
                     errFile.createNewFile();
                     OutputStream out = new FileOutputStream(errFile);

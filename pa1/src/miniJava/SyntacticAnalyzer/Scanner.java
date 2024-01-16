@@ -52,10 +52,10 @@ public class Scanner {
 		keywordTrieRoot.insert("while", TokenType.While);
 		keywordTrieRoot.insert("do", TokenType.Do);
 		keywordTrieRoot.insert("switch", TokenType.Switch);
-		keywordTrieRoot.insert("public", TokenType.Public);
-		keywordTrieRoot.insert("private", TokenType.Private);
-		keywordTrieRoot.insert("protected", TokenType.Protected);
-		keywordTrieRoot.insert("default", TokenType.Default);
+		keywordTrieRoot.insert("public", TokenType.Visibility);
+		keywordTrieRoot.insert("private", TokenType.Visibility);
+		keywordTrieRoot.insert("protected", TokenType.Visibility);
+		keywordTrieRoot.insert("default", TokenType.Visibility);
 		keywordTrieRoot.insert("static", TokenType.Static);
 		keywordTrieRoot.insert("void", TokenType.VoidType);
 		keywordTrieRoot.insert("boolean", TokenType.BooleanType);
@@ -112,46 +112,26 @@ public class Scanner {
 								currText.append(' ');
 							} else { // check for "/" operator
 								state = State.TokenEnd;
-								tokenType = TokenType.FSlash;
+								tokenType = TokenType.ArithmeticBinOp;
 							}
 						}
-						case '+' -> {
+						case '+', '-', '*' -> {
 							takeCurr();
-							tokenType = TokenType.Plus;
-							state = State.TokenEnd;
-						}
-						case '-' -> {
-							takeCurr();
-							tokenType = TokenType.Minus;
-							state = State.TokenEnd;
-						}
-						case '*' -> {
-							takeCurr();
-							tokenType = TokenType.Star;
+							tokenType = TokenType.ArithmeticBinOp;
 							state = State.TokenEnd;
 						}
 						case '=' -> {
 							takeCurr();
 							if (currChar == '=') {
 								takeCurr();
-								tokenType = TokenType.DoubleEquals;
-							} else tokenType = TokenType.Equals;
+								tokenType = TokenType.RelationalBinOp;
+							} else tokenType = TokenType.AssignmentOp;
 							state = State.TokenEnd;
 						}
-						case '<' -> {
+						case '<', '>' -> {
 							takeCurr();
-							if (currChar == '=') {
-								takeCurr();
-								tokenType = TokenType.LessOrEquals;
-							} else tokenType = TokenType.LessThan;
-							state = State.TokenEnd;
-						}
-						case '>' -> {
-							takeCurr();
-							if (currChar == '=') {
-								takeCurr();
-								tokenType = TokenType.GreaterOrEquals;
-							} else tokenType = TokenType.GreaterThan;
+							if (currChar == '=') takeCurr();
+							tokenType = TokenType.RelationalBinOp;
 							state = State.TokenEnd;
 						}
 						case '"' -> {
@@ -164,38 +144,31 @@ public class Scanner {
 							tokenType = TokenType.CharLiteral;
 							state = State.Token;
 						}
-						case '&' -> {
+						case '&', '|' -> {
+							char c = currChar;
 							takeCurr();
-							if (currChar == '&') {
+							if (currChar == c) {
 								takeCurr();
-								tokenType = TokenType.DoubleAnd;
-							} else tokenType = TokenType.And;
-							state = State.TokenEnd;
-						}
-						case '|' -> {
-							takeCurr();
-							if (currChar == '|') {
-								takeCurr();
-								tokenType = TokenType.DoubleOr;
-							} else tokenType = TokenType.Or;
+								tokenType = TokenType.LogicalBinOp;
+							} else tokenType = TokenType.BitwiseBinOp;
 							state = State.TokenEnd;
 						}
 						case '!' -> {
 							takeCurr();
 							if (currChar == '=') {
 								takeCurr();
-								tokenType = TokenType.NotEquals;
-							} else tokenType = TokenType.Not;
+								tokenType = TokenType.RelationalBinOp;
+							} else tokenType = TokenType.LogicalUnOp;
 							state = State.TokenEnd;
 						}
 						case '^' -> {
 							takeCurr();
-							tokenType = TokenType.Caret;
+							tokenType = TokenType.BitwiseBinOp;
 							state = State.TokenEnd;
 						}
 						case '~' -> {
 							takeCurr();
-							tokenType = TokenType.Tilde;
+							tokenType = TokenType.BitwiseUnOp;
 							state = State.TokenEnd;
 						}
 						case ',' -> {

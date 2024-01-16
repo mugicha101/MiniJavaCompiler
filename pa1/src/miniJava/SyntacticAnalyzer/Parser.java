@@ -95,7 +95,7 @@ public class Parser {
 	private void parseClassDeclaration() throws SyntaxError {
 		accept(TokenType.Class, TokenType.Identifier, TokenType.LCurly);
 		while (!currTokenMatches(TokenType.RCurly)) {
-			parseVisibility();
+			accept(TokenType.Visibility);
 			parseAccess();
 			boolean method = false;
 			if (optionalAccept(TokenType.VoidType)) {
@@ -111,16 +111,6 @@ public class Parser {
 			accept(TokenType.RCurly);
 		}
 		accept(TokenType.RCurly);
-	}
-
-	// Visibility ::= (public|private)?
-	private void parseVisibility() throws SyntaxError {
-		TokenType[] visibilityTokens = { TokenType.Public, TokenType.Private };
-		for (TokenType token : visibilityTokens) {
-			if (optionalAccept(token)) return;
-		}
-		errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected visibility, but got %s", currToken.getTokenText()));
-		throw new SyntaxError();
 	}
 
 	// Access ::= static?
@@ -206,13 +196,13 @@ public class Parser {
 			} else {
 				optionalAccept(TokenType.Identifier);
 			}
-			accept(TokenType.Equals);
+			accept(TokenType.AssignmentOp);
 			parseExpression();
 			accept(TokenType.Semicolon);
 			return true;
 		}
 		if (parseOptionalType()) {
-			accept(TokenType.Identifier, TokenType.Equals);
+			accept(TokenType.Identifier, TokenType.AssignmentOp);
 			parseExpression();
 			accept(TokenType.Semicolon);
 			return true;
@@ -220,10 +210,10 @@ public class Parser {
 		if (parseOptionalReference()) {
 			if (optionalAccept(TokenType.LBracket)) {
 				parseExpression();
-				accept(TokenType.RBracket, TokenType.Equals);
+				accept(TokenType.RBracket, TokenType.AssignmentOp);
 				parseExpression();
 			}
-			else if (optionalAccept(TokenType.Equals)) parseExpression();
+			else if (optionalAccept(TokenType.AssignmentOp)) parseExpression();
 			else if (optionalAccept(TokenType.LParen)) {
 				parseOptionalArgumentList();
 				accept(TokenType.RParen);
@@ -322,21 +312,16 @@ public class Parser {
 	}
 
 	private boolean parseOptionalBinop() {
-		TokenType[] binopTokens = {
-				TokenType.Plus, TokenType.Minus, TokenType.Star, TokenType.FSlash,
-				TokenType.DoubleEquals, TokenType.NotEquals, TokenType.LessThan,  TokenType.GreaterThan, TokenType.LessOrEquals, TokenType.GreaterOrEquals,
-				TokenType.And, TokenType.Or, TokenType.Caret,
-				TokenType.DoubleAnd, TokenType.DoubleOr
-		};
-		for (TokenType token : binopTokens) {
+		TokenType[] binOpTokens = { TokenType.ArithmeticBinOp, TokenType.Minus, TokenType.RelationalBinOp, TokenType.BitwiseBinOp, TokenType.LogicalBinOp };
+		for (TokenType token : binOpTokens) {
 			if (optionalAccept(token)) return true;
 		}
 		return false;
 	}
 
 	private boolean parseOptionalUnop() {
-		TokenType[] unopTokens = { TokenType.Not, TokenType.Tilde, TokenType.Minus };
-		for (TokenType token : unopTokens) {
+		TokenType[] unOpTokens = { TokenType.BitwiseUnOp, TokenType.LogicalUnOp, TokenType.Minus };
+		for (TokenType token : unOpTokens) {
 			if (optionalAccept(token)) return true;
 		}
 		return false;
