@@ -21,7 +21,7 @@ public class Parser {
 
 	public void debugPrintTokens() {
 		while (currToken.getTokenType() != TokenType.End) {
-			System.out.println(currToken.getTokenType() + " " + currToken.getTokenText());
+			System.out.println(String.format("%d:%d %s %s", currToken.getLine(), currToken.getOffset(), currToken.getTokenType(), currToken.getTokenText()));
 			currToken = scanner.scan();
 		}
 		System.out.println(currToken.getTokenType() + " " + currToken.getTokenText());

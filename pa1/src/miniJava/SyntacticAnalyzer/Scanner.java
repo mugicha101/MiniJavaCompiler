@@ -138,6 +138,22 @@ public class Scanner {
 							} else tokenType = TokenType.Equals;
 							state = State.TokenEnd;
 						}
+						case '<' -> {
+							takeCurr();
+							if (currChar == '=') {
+								takeCurr();
+								tokenType = TokenType.LessOrEquals;
+							} else tokenType = TokenType.LessThan;
+							state = State.TokenEnd;
+						}
+						case '>' -> {
+							takeCurr();
+							if (currChar == '=') {
+								takeCurr();
+								tokenType = TokenType.GreaterOrEquals;
+							} else tokenType = TokenType.GreaterThan;
+							state = State.TokenEnd;
+						}
 						case '"' -> {
 							takeCurr();
 							tokenType = TokenType.StringLiteral;
@@ -337,6 +353,11 @@ public class Scanner {
 					}
 				}
 			}
+		}
+		if (tokenType != TokenType.End && currText.isEmpty()) {
+			errors.reportError(line, offset, String.format("invalid symbol %c", currChar));
+			tokenType = TokenType.End;
+			currText.append(currChar);
 		}
 		return makeToken(tokenType, startLine, startOffset);
 	}
