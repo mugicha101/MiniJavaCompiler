@@ -26,4 +26,8 @@ public class ErrorReporter {
 			sb.append(m);
 		errorQueue.add(String.format("%d:%d %s", line, offset, sb.toString()));
 	}
+
+	public List<String> getErrors() {
+		return new ArrayList<>(errorQueue);
+	}
 }

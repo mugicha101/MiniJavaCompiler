@@ -14,9 +14,8 @@ public class Compiler {
 		try {
 			File file = new File(args[0]);
 			in = new FileInputStream(file);
-		} catch(IOException e) {
-			// TODO: handle exception
-			throw new RuntimeException("file error");
+		} catch (IOException e) {
+			throw new RuntimeException("file open error");
 		}
 		Scanner scanner = new Scanner(in, errors);
 		Parser parser = new Parser(scanner, errors);
@@ -26,6 +25,11 @@ public class Compiler {
 			errors.outputErrors();
 		} else {
 			System.out.println("Success");
+		}
+		try {
+			in.close();
+		} catch (IOException e) {
+			throw new RuntimeException("file close error");
 		}
 	}
 }

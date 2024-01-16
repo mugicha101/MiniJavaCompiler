@@ -2,15 +2,66 @@ package miniJava.SyntacticAnalyzer;
 
 import miniJava.ErrorReporter;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class Parser {
+	private static class UnitTestData {
+		public final List<Token> tokenList;
+		public final List<String> outputLines;
+		private final ErrorReporter errors;
+		UnitTestData(ErrorReporter errors) {
+			tokenList = new ArrayList<>();
+			outputLines = new ArrayList<>();
+			this.errors = errors;
+		}
+
+		public void insertToken(Token token) {
+			tokenList.add(token);
+		}
+
+		public void addOutputLine(String line) {
+			outputLines.add(line);
+		}
+
+		@Override
+		public String toString() {
+			List<String> output = new ArrayList<>();
+			String separator = "=".repeat(16);
+			output.add(separator + " Tokens " + separator);
+			for (Token token : tokenList) {
+				output.add(String.format("%d:%d %s{%s}", token.getLine(), token.getOffset(), token.getTokenType(), token.getTokenText()));
+			}
+			output.add(separator + " Debug " + separator);
+			output.addAll(outputLines);
+			output.add(separator + " Errors " + separator);
+			List<String> errorList = errors.getErrors();
+			output.addAll(errorList);
+			return String.join("\n", output);
+		}
+	}
+
 	private Scanner scanner;
 	private ErrorReporter errors;
 	private Token currToken;
+	private boolean unitTest;
+	private UnitTestData testData;
 	
-	public Parser( Scanner scanner, ErrorReporter errors ) {
+	public Parser(Scanner scanner, ErrorReporter errors) {
+		this.unitTest = false;
 		this.scanner = scanner;
 		this.errors = errors;
-		this.currToken = this.scanner.scan();
+		nextToken();
+	}
+
+	public void enableUnitTest() {
+		unitTest = true;
+		testData = new UnitTestData(errors);
+	}
+
+	public String getTestOutput() {
+		if (!unitTest) return "unit test data collection inactive";
+		return testData.toString();
 	}
 	
 	class SyntaxError extends Error {
@@ -20,14 +71,13 @@ public class Parser {
 	public void debugPrintTokens() {
 		while (currToken.getTokenType() != TokenType.End) {
 			System.out.println(String.format("%d:%d %s %s", currToken.getLine(), currToken.getOffset(), currToken.getTokenType(), currToken.getTokenText()));
-			currToken = scanner.scan();
+			nextToken();
 		}
 		System.out.println(currToken.getTokenType() + " " + currToken.getTokenText());
 	}
 	
 	public void parse() {
 		try {
-			// The first thing we need to parse is the Program symbol
 			parseProgram();
 		} catch( SyntaxError e ) { }
 	}
@@ -300,6 +350,11 @@ public class Parser {
 		return false;
 	}
 
+	private void nextToken() {
+		currToken = scanner.scan();
+		if (unitTest) testData.tokenList.add(currToken);
+	}
+
 	// This method will accept the token and retrieve the next token.
 	//  Can be useful if you want to error check and accept all-in-one.
 	private void accept(TokenType... expectedTypes) throws SyntaxError {
@@ -314,7 +369,7 @@ public class Parser {
 
 	private boolean optionalAccept(TokenType type) {
 		if (currToken.getTokenType() != type) return false;
-		currToken = scanner.scan();
+		nextToken();
 		return true;
 	}
 
