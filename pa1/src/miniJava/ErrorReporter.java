@@ -16,7 +16,7 @@ public class ErrorReporter {
 	
 	public void outputErrors() {
 		for (String error : errorQueue) {
-			System.err.println(error);
+			System.out.println(error);
 		}
 	}
 	

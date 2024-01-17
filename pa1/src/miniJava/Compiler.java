@@ -21,7 +21,7 @@ public class Compiler {
 		Parser parser = new Parser(scanner, errors);
 		parser.parse();
 		if (errors.hasErrors()) {
-			System.err.println("Error");
+			System.out.println("Error");
 			errors.outputErrors();
 		} else {
 			System.out.println("Success");
