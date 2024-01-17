@@ -219,6 +219,11 @@ public class Scanner {
 							tokenType = TokenType.RCurly;
 							state = State.TokenEnd;
 						} break;
+						case '_': {
+							// invalid identifier (cannot start with _)
+							state = State.TokenEnd;
+							tokenType = TokenType.Identifier;
+						} break;
 						default: {
 							if (currIsWhitespace()) {
 								skipCurr();
@@ -326,8 +331,8 @@ public class Scanner {
 			}
 		}
 		if (tokenType != TokenType.End && currText.length() == 0) {
-			errors.reportError(line, offset, String.format("invalid symbol %c", currChar));
-			tokenType = TokenType.End;
+			errors.reportError(line, offset, String.format("Invalid symbol %c", currChar));
+			tokenType = TokenType.Error;
 			currText.append(currChar);
 		}
 		return makeToken(tokenType, startLine, startOffset);

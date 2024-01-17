@@ -28,5 +28,5 @@ public enum TokenType {
     LCurly, RCurly, LParen, RParen, LBracket, RBracket, // parenthesis family
     Comma, Semicolon, Colon, Dot, // misc single character tokens
     IncompleteStringLiteral, IncompleteCharLiteral, // error tokens
-    End
+    End, Error
 }

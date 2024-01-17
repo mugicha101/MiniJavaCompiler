@@ -69,16 +69,18 @@ public class Parser {
 		return testData.toString();
 	}
 	
-	class SyntaxError extends Error {
+	static class SyntaxError extends Error {
 		private static final long serialVersionUID = -6461942006097999362L;
 	}
 
 	public void debugPrintTokens() {
-		while (currToken.getTokenType() != TokenType.End) {
-			System.out.println(String.format("%d:%d %s %s", currToken.getLine(), currToken.getOffset(), currToken.getTokenType(), currToken.getTokenText()));
-			nextToken();
-		}
-		System.out.println(currToken.getTokenType() + " " + currToken.getTokenText());
+		try {
+			while (currToken.getTokenType() != TokenType.End) {
+				System.out.println(String.format("%d:%d %s %s", currToken.getLine(), currToken.getOffset(), currToken.getTokenType(), currToken.getTokenText()));
+				nextToken();
+			}
+			System.out.println(currToken.getTokenType() + " " + currToken.getTokenText());
+		} catch (SyntaxError e) { }
 	}
 	
 	public void parse() {
@@ -340,9 +342,12 @@ public class Parser {
 		return false;
 	}
 
-	private void nextToken() {
+	private void nextToken() throws SyntaxError {
 		currToken = scanner.scan();
 		if (unitTest) testData.tokenList.add(currToken);
+		if (currTokenMatches(TokenType.Error)) {
+			throw new SyntaxError();
+		}
 	}
 
 	// This method will accept the token and retrieve the next token.
@@ -353,11 +358,11 @@ public class Parser {
 				errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected token %s, but got %s", expectedType, currToken.getTokenText()));
 				throw new SyntaxError();
 			}
-			currToken = scanner.scan();
+			nextToken();
 		}
 	}
 
-	private boolean optionalAccept(TokenType type) {
+	private boolean optionalAccept(TokenType type) throws SyntaxError {
 		if (currToken.getTokenType() != type) return false;
 		nextToken();
 		return true;
