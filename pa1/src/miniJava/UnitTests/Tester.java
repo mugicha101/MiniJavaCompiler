@@ -49,10 +49,9 @@ public class Tester {
                 file = new File(test.expectedPath);
                 in.close();
                 in = new FileInputStream(file);
-                byte[] expectedBytes = in.readAllBytes();
                 StringBuilder expectedSb = new StringBuilder();
-                for (byte b : expectedBytes) {
-                    expectedSb.append((char)b);
+                while (in.available() != 0) {
+                    expectedSb.append((char)in.read());
                 }
                 String expected = trimString(expectedSb.toString());
                 if (output.equals(expected)) {

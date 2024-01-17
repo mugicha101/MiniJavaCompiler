@@ -79,27 +79,25 @@ public class Scanner {
 
 		nextChar();
 	}
+
+	private enum State { Unknown, Token, TokenEnd, SingleLineComment, MultiLineComment }
 	
 	public Token scan() {
 		clearCurrText();
-
-		// define states
-		enum State {Unknown, Token, TokenEnd, SingleLineComment, MultiLineComment}
 		State state = State.Unknown;
 		TokenType tokenType = TokenType.End;
 		KeywordTrieNode keywordTrieNode = keywordTrieRoot;
 		int startLine = line;
 		int startOffset = offset;
 
-		// define state transitions
 		while (state != State.TokenEnd) {
 			switch (state) {
-				case Unknown -> {
+				case Unknown: {
 					startLine = line;
 					startOffset = offset;
 					switch (currChar) {
-						case EOF -> state = State.TokenEnd;
-						case '/' -> {
+						case EOF: state = State.TokenEnd; break;
+						case '/': {
 							takeCurr();
 							if (currChar == '/') { // check for "//" comment start
 								state = State.SingleLineComment;
@@ -114,37 +112,37 @@ public class Scanner {
 								state = State.TokenEnd;
 								tokenType = TokenType.ArithmeticBinOp;
 							}
-						}
-						case '+', '-', '*' -> {
+						} break;
+						case '+': case '-': case '*': {
 							takeCurr();
 							tokenType = TokenType.ArithmeticBinOp;
 							state = State.TokenEnd;
-						}
-						case '=' -> {
+						} break;
+						case '=': {
 							takeCurr();
 							if (currChar == '=') {
 								takeCurr();
 								tokenType = TokenType.RelationalBinOp;
 							} else tokenType = TokenType.AssignmentOp;
 							state = State.TokenEnd;
-						}
-						case '<', '>' -> {
+						} break;
+						case '<': case '>': {
 							takeCurr();
 							if (currChar == '=') takeCurr();
 							tokenType = TokenType.RelationalBinOp;
 							state = State.TokenEnd;
-						}
-						case '"' -> {
+						} break;
+						case '"': {
 							takeCurr();
 							tokenType = TokenType.StringLiteral;
 							state = State.Token;
-						}
-						case '\'' -> {
+						} break;
+						case '\'': {
 							takeCurr();
 							tokenType = TokenType.CharLiteral;
 							state = State.Token;
-						}
-						case '&', '|' -> {
+						} break;
+						case '&': case '|': {
 							char c = currChar;
 							takeCurr();
 							if (currChar == c) {
@@ -152,76 +150,76 @@ public class Scanner {
 								tokenType = TokenType.LogicalBinOp;
 							} else tokenType = TokenType.BitwiseBinOp;
 							state = State.TokenEnd;
-						}
-						case '!' -> {
+						} break;
+						case '!': {
 							takeCurr();
 							if (currChar == '=') {
 								takeCurr();
 								tokenType = TokenType.RelationalBinOp;
 							} else tokenType = TokenType.LogicalUnOp;
 							state = State.TokenEnd;
-						}
-						case '^' -> {
+						} break;
+						case '^': {
 							takeCurr();
 							tokenType = TokenType.BitwiseBinOp;
 							state = State.TokenEnd;
-						}
-						case '~' -> {
+						} break;
+						case '~': {
 							takeCurr();
 							tokenType = TokenType.BitwiseUnOp;
 							state = State.TokenEnd;
-						}
-						case ',' -> {
+						} break;
+						case ',': {
 							takeCurr();
 							tokenType = TokenType.Comma;
 							state = State.TokenEnd;
-						}
-						case ';' -> {
+						} break;
+						case ';': {
 							takeCurr();
 							tokenType = TokenType.Semicolon;
 							state = State.TokenEnd;
-						}
-						case ':' -> {
+						} break;
+						case ':': {
 							takeCurr();
 							tokenType = TokenType.Colon;
 							state = State.TokenEnd;
-						}
-						case '.' -> {
+						} break;
+						case '.': {
 							takeCurr();
 							tokenType = TokenType.Dot;
 							state = State.TokenEnd;
-						}
-						case '(' -> {
+ 						} break;
+						case '(': {
 							takeCurr();
 							tokenType = TokenType.LParen;
 							state = State.TokenEnd;
-						}
-						case ')' -> {
+						} break;
+						case ')': {
 							takeCurr();
 							tokenType = TokenType.RParen;
 							state = State.TokenEnd;
-						}
-						case '[' -> {
+						} break;
+						case '[': {
 							takeCurr();
 							tokenType = TokenType.LBracket;
 							state = State.TokenEnd;
-						}
-						case ']' -> {
+						} break;
+						case ']': {
 							takeCurr();
 							tokenType = TokenType.RBracket;
 							state = State.TokenEnd;
-						}
-						case '{' -> {
+						} break;
+						case '{': {
 							takeCurr();
 							tokenType = TokenType.LCurly;
 							state = State.TokenEnd;
-						}
-						case '}' -> {
+						} break;
+						case '}': {
 							takeCurr();
 							tokenType = TokenType.RCurly;
 							state = State.TokenEnd;
-						}
-						default -> {
+						} break;
+						default: {
 							if (currIsWhitespace()) {
 								skipCurr();
 							} else if (currIsDigit()) {
@@ -234,28 +232,28 @@ public class Scanner {
 								tokenType = TokenType.Identifier;
 								// note: primitive types tagged as identifiers until matches keyword
 							}
-						}
+						} break;
 					}
-				}
-				case SingleLineComment -> {
+				} break;
+				case SingleLineComment: {
 					if (currIsNewline()) state = State.Unknown;
 					skipCurr();
-				}
-				case MultiLineComment -> {
+				} break;
+				case MultiLineComment: {
 					if (currText.charAt(0) == '*' && currChar == '/') {
 						clearCurrText();
 						state = State.Unknown;
 					} else currText.setCharAt(0, currChar);
 					skipCurr();
-				}
-				case Token -> {
+				} break;
+				case Token: {
 					if (currIsNewline()) {
 						state = State.TokenEnd;
 						break;
 					}
-					boolean backslash = !currText.isEmpty() && currText.charAt(currText.length()-1) == '\\';
+					boolean backslash = currText.length() != 0 && currText.charAt(currText.length()-1) == '\\';
 					switch (tokenType) {
-						case Identifier -> {
+						case Identifier: {
 							// check for invalid identifier characters (all keywords must also comply with this)
 							if (!currIsLetter() && !currIsDigit() && currChar != '_') {
 								state = State.TokenEnd;
@@ -271,8 +269,8 @@ public class Scanner {
 								}
 							}
 							takeCurr();
-						}
-						case IntLiteral -> {
+						} break;
+						case IntLiteral: {
 							if (currIsDigit()) {
 								takeCurr();
 							} else if (currChar == '.') {
@@ -286,8 +284,8 @@ public class Scanner {
 							} else {
 								state = State.TokenEnd;
 							}
-						}
-						case DoubleLiteral -> {
+						} break;
+						case DoubleLiteral: {
 							if (currIsDigit()) {
 								takeCurr();
 							} else if (currChar == 'f' || currChar == 'F') {
@@ -297,8 +295,8 @@ public class Scanner {
 							} else {
 								state = State.TokenEnd;
 							}
-						}
-						case StringLiteral -> {
+						} break;
+						case StringLiteral: {
 							if (currIsNewline()) {
 								state = State.TokenEnd;
 								tokenType = TokenType.IncompleteStringLiteral;
@@ -308,8 +306,8 @@ public class Scanner {
 							} else {
 								takeCurr();
 							}
-						}
-						case CharLiteral -> {
+						} break;
+						case CharLiteral: {
 							if (currIsNewline()) {
 								state = State.TokenEnd;
 								tokenType = TokenType.IncompleteCharLiteral;
@@ -317,17 +315,17 @@ public class Scanner {
 								state = State.TokenEnd;
 								takeCurr();
 							} else takeCurr();
-						}
-						default -> {
+						} break;
+						default: {
 							if (currIsWhitespace()) {
 								state = State.TokenEnd;
 							} else takeCurr();
-						}
+						} break;
 					}
-				}
+				} break;
 			}
 		}
-		if (tokenType != TokenType.End && currText.isEmpty()) {
+		if (tokenType != TokenType.End && currText.length() == 0) {
 			errors.reportError(line, offset, String.format("invalid symbol %c", currChar));
 			tokenType = TokenType.End;
 			currText.append(currChar);

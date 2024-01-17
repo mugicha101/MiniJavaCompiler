@@ -27,7 +27,12 @@ public class Parser {
 		@Override
 		public String toString() {
 			List<String> output = new ArrayList<>();
-			String separator = "=".repeat(16);
+			String separator;
+			{
+				StringBuilder sb = new StringBuilder();
+				for (int i = 0; i < 16; ++i) sb.append('=');
+				separator = sb.toString();
+			}
 			output.add(separator + " Tokens " + separator);
 			for (Token token : tokenList) {
 				output.add(String.format("%d:%d %s{%s}", token.getLine(), token.getOffset(), token.getTokenType(), token.getTokenText()));
