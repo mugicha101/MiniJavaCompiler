@@ -8,7 +8,7 @@ import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
 
-public class Tester {
+public class UnitTester {
     public static class Test {
         String inputPath;
         String expectedPath;
