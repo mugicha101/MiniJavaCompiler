@@ -99,10 +99,11 @@ public class Parser {
 	// ClassDeclaration ::= class identifier { (FieldDeclaration|MethodDeclaration)* }
 	// FieldDeclaration ::= Visibility Access Type id ;
 	// MethodDeclaration ::= Visibility Access (Type|void) id \( ParameterList? \) { Statement* }
+	// Visibility ::= (public|private)?
 	private void parseClassDeclaration() throws SyntaxError {
 		accept(TokenType.Class, TokenType.Identifier, TokenType.LCurly);
 		while (!currTokenMatches(TokenType.RCurly)) {
-			accept(TokenType.Visibility);
+			optionalAccept(TokenType.Visibility);
 			parseAccess();
 			boolean method = false;
 			if (optionalAccept(TokenType.VoidType)) {
@@ -173,7 +174,7 @@ public class Parser {
 	}
 
 	// Statement ::=
-	// { Statement* }
+	//     { Statement* }
 	//     | Type id = Expression ;
 	//     | Reference = Expression ;
 	//     | Reference [ Expression ] = Expression ;
@@ -189,22 +190,35 @@ public class Parser {
 		}
 		// starting with identifier can result in either type or reference
 		if (optionalAccept(TokenType.Identifier)) {
+			boolean doAssignment = true;
 			if (optionalAccept(TokenType.LBracket)) {
 				// type if [], after reference if [expression]
-				parseOptionalExpression();
+				boolean isRef = parseOptionalExpression();
 				accept(TokenType.RBracket);
+				if (!isRef) accept(TokenType.Identifier);
 			} else if (currTokenMatches(TokenType.Dot)) {
 				// reference
 				while (optionalAccept(TokenType.Dot)) accept(TokenType.Identifier);
 				if (optionalAccept(TokenType.LBracket)) {
 					parseExpression();
 					accept(TokenType.RBracket);
+				} else if (optionalAccept(TokenType.LParen)) {
+					doAssignment = false;
+					parseOptionalArgumentList();
+					accept(TokenType.RParen);
 				}
+			} else if (optionalAccept(TokenType.LParen)) {
+				// reference
+				doAssignment = false;
+				parseOptionalArgumentList();
+				accept(TokenType.RParen);
 			} else {
 				optionalAccept(TokenType.Identifier);
 			}
-			accept(TokenType.AssignmentOp);
-			parseExpression();
+			if (doAssignment) {
+				accept(TokenType.AssignmentOp);
+				parseExpression();
+			}
 			accept(TokenType.Semicolon);
 			return true;
 		}
@@ -291,7 +305,10 @@ public class Parser {
 		} else if (optionalAccept(TokenType.New)) {
 			if (optionalAccept(TokenType.Identifier)) {
 				if (optionalAccept(TokenType.LParen)) accept(TokenType.RParen);
-				else if (optionalAccept(TokenType.LBracket)) accept(TokenType.RBracket);
+				else if (optionalAccept(TokenType.LBracket)) {
+					parseExpression();
+					accept(TokenType.RBracket);
+				}
 				else {
 					errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected ( or [ after new identifier, but got %s", currToken.getTokenText()));
 					throw new SyntaxError();

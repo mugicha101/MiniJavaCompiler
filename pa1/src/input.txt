@@ -1,23 +1,12 @@
+// PA1 parse refs pass
 class Test {
-    private int testVal;
-    public String str1;
-    /* multi
-       line
-       comment */
 
-    private int foo(int val) {
-        return testVal + val * 3;
-    }
-
-    public static void main(String[] args) {
-        int x = 2;
-        testVal = 5;
-        Fizz.buzz.arr[0] = Integer.toString(foo(8/x));
-
-        if (testVal >= 9) {
-            return true;
-        } else {
-            return false;
-        }
+    void p() {
+        a = true;
+        a [b] = c;
+        p ();
+        a.b = d;
+        c.p(e);
     }
 }
+

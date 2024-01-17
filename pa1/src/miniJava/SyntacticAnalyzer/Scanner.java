@@ -113,9 +113,14 @@ public class Scanner {
 								tokenType = TokenType.ArithmeticBinOp;
 							}
 						} break;
-						case '+': case '-': case '*': {
+						case '+': case '*': {
 							takeCurr();
 							tokenType = TokenType.ArithmeticBinOp;
+							state = State.TokenEnd;
+						} break;
+						case '-': {
+							takeCurr();
+							tokenType = TokenType.Minus;
 							state = State.TokenEnd;
 						} break;
 						case '=': {
@@ -261,18 +266,15 @@ public class Scanner {
 						case Identifier: {
 							// check for invalid identifier characters (all keywords must also comply with this)
 							if (!currIsLetter() && !currIsDigit() && currChar != '_') {
+								// check for keyword match
+								if (keywordTrieNode != null && keywordTrieNode.getTokenType() != null)
+									tokenType = keywordTrieNode.getTokenType();
 								state = State.TokenEnd;
 								break;
 							}
 
-							// check for keyword match
-							if (keywordTrieNode != null) {
-								keywordTrieNode = keywordTrieNode.step(currChar);
-								if (keywordTrieNode != null && keywordTrieNode.getTokenType() != null) {
-									tokenType = keywordTrieNode.getTokenType();
-									state = State.TokenEnd;
-								}
-							}
+							// update keyword trie
+							if (keywordTrieNode != null) keywordTrieNode = keywordTrieNode.step(currChar);
 							takeCurr();
 						} break;
 						case IntLiteral: {
@@ -372,6 +374,7 @@ public class Scanner {
 			// handle end of file
 			if (in.available() == 0) {
 				currChar = EOF;
+				offset += 1;
 				return;
 			}
 

@@ -1,0 +1,23 @@
+================ Tokens ================
+1:6 Identifier{id}
+1:9 LCurly{{}
+2:4 VoidType{void}
+2:9 Identifier{p}
+2:10 LParen{(}
+2:11 RParen{)}
+2:12 LCurly{{}
+3:8 BooleanType{boolean}
+3:16 Identifier{x}
+3:18 AssignmentOp{=}
+3:21 LogicalUnOp{!}
+3:22 LogicalUnOp{!}
+3:23 LogicalUnOp{!}
+3:24 LogicalUnOp{!}
+3:25 LogicalUnOp{!}
+3:26 Identifier{b}
+3:27 Semicolon{;}
+4:4 RCurly{}}
+5:0 RCurly{}}
+7:0 End{}
+================ Debug ================
+================ Errors ================
