@@ -2,8 +2,17 @@ package miniJava.SyntacticAnalyzer;
 
 import miniJava.ErrorReporter;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+
+/* NOTE: Includes two different approaches
+   - stable mode: uses a context free grammar parser to match tokens,
+     requires a token history list and keeps track of many different possible paths at once
+     which reduces performance, however is easier to show correctness
+   - unstable mode: uses a large state machine to match tokens one at a time,
+     token history handled by the state machine rather than storing tokens in a list
+     and only keeps track of a single state which improves performance, however
+     is hard to show correctness
+*/
 
 public class Parser {
 	private static class UnitTestData {
@@ -48,15 +57,22 @@ public class Parser {
 
 	private Scanner scanner;
 	private ErrorReporter errors;
+	private List<Token> tokenHistory;
 	private Token currToken;
 	private boolean unitTest;
+	private boolean unstableMode;
 	private UnitTestData testData;
 	
-	public Parser(Scanner scanner, ErrorReporter errors) {
+	public Parser(Scanner scanner, ErrorReporter errors, boolean unstableMode) {
 		this.unitTest = false;
 		this.scanner = scanner;
 		this.errors = errors;
+		this.unstableMode = unstableMode;
+		tokenHistory = new ArrayList<>();
 		nextToken();
+	}
+	public Parser(Scanner scanner, ErrorReporter errors) {
+		this(scanner, errors, false);
 	}
 
 	public void enableUnitTest() {
@@ -85,8 +101,60 @@ public class Parser {
 	
 	public void parse() {
 		try {
-			parseProgram();
+			if (unstableMode) parseProgram();
+			else parseGrammar();
 		} catch( SyntaxError e ) { }
+	}
+
+	private class SymbolStackPriorityComparitor implements Comparator<SymbolStack> {
+		@Override
+		// prioritize stacks with maximal token index first then minimal prod count
+		public int compare(SymbolStack s1, SymbolStack s2) {
+			if (s1.tokenIndex != s2.tokenIndex) {
+				return s2.tokenIndex - s1.tokenIndex;
+			}
+			return s1.prodCount - s2.prodCount;
+		}
+	}
+
+	private void parseGrammar() throws SyntaxError {
+		Comparator<SymbolStack> comparator = new SymbolStackPriorityComparitor();
+		Queue<SymbolStack> stateQueue = new PriorityQueue<>(10, comparator);
+		stateQueue.add(new SymbolStack(new Symbol[] { Symbol.getSymbol(SymbolType.Program) }, 0, 0));
+		HashSet<TokenType> expectedTerminals = new HashSet<>();
+		while (!stateQueue.isEmpty()) {
+			SymbolStack symbolStack = stateQueue.remove();
+			// System.out.println(symbolStack.toString());
+			if (symbolStack.stack.length == 0) return; // finished parsing
+			while (tokenHistory.get(tokenHistory.size()-1).getTokenType() != TokenType.End
+					&& symbolStack.tokenIndex >= tokenHistory.size()) {
+				nextToken();
+				expectedTerminals.clear();
+			}
+			if (symbolStack.tokenIndex >= tokenHistory.size())
+				continue;
+			TokenType nextTerminal = tokenHistory.get(symbolStack.tokenIndex).getTokenType();
+			Symbol top = symbolStack.top();
+			if (top.isTerminal()) {
+				if (top.getTerminalType() == nextTerminal) {
+					stateQueue.add(symbolStack.handleTerminal());
+				} else {
+					expectedTerminals.add(top.getTerminalType());
+				}
+			} else {
+				for (Symbol[] prod : Symbol.getProductions(top.getSymbolType())) {
+					stateQueue.add(symbolStack.handleProduction(prod));
+				}
+			}
+		}
+		String[] expectedTerminalsStrArr = new String[expectedTerminals.size()];
+		int i = 0;
+		for (TokenType token : expectedTerminals) {
+			expectedTerminalsStrArr[i++] = "{" + token.toString() + "}";
+		}
+		if (expectedTerminalsStrArr.length > 1) expectedTerminalsStrArr[expectedTerminalsStrArr.length-1] = "or " + expectedTerminalsStrArr[expectedTerminalsStrArr.length-1];
+		errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Unexpected Token: Expected %s, but instead got {%s} matching the following text: \"%s\"", String.join(expectedTerminalsStrArr.length > 2 ? ", " : " ", expectedTerminalsStrArr), currToken.getTokenType(), currToken.getTokenText()));
+		throw new SyntaxError();
 	}
 	
 	// Program ::= (ClassDeclaration)* eot
@@ -362,6 +430,7 @@ public class Parser {
 	private void nextToken() throws SyntaxError {
 		currToken = scanner.scan();
 		if (unitTest) testData.tokenList.add(currToken);
+		if (!unstableMode) tokenHistory.add(currToken);
 		if (currTokenMatches(TokenType.Error)) {
 			throw new SyntaxError();
 		}

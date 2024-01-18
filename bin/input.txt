@@ -1,12 +1,6 @@
-// PA1 parse refs pass
+// PA1 parse ref expr fail
 class Test {
-
-    void p() {
-        a = true;
-        a [b] = c;
-        p ();
-        a.b = d;
-        c.p(e);
-    }
+   void main () {
+       this.id.this = this.id.this;
+   }
 }
-
