@@ -108,12 +108,9 @@ public class Parser {
 
 	private class SymbolStackPriorityComparitor implements Comparator<SymbolStack> {
 		@Override
-		// prioritize stacks with maximal token index first then minimal prod count
+		// prioritize stacks with maximal token index first then maximal prod count
 		public int compare(SymbolStack s1, SymbolStack s2) {
-			if (s1.tokenIndex != s2.tokenIndex) {
-				return s2.tokenIndex - s1.tokenIndex;
-			}
-			return s1.prodCount - s2.prodCount;
+			return s1.tokenIndex != s2.tokenIndex ? s2.tokenIndex - s1.tokenIndex : s2.prodCount - s1.prodCount;
 		}
 	}
 
