@@ -5,16 +5,12 @@ import miniJava.ErrorReporter;
 import java.util.*;
 
 /* NOTE: Includes two different approaches
-   - stable mode: uses a push-down automata to match tokens,
-     requires a token history list and keeps track of many different possible paths at once
-     which reduces performance, however is easier to show correctness
-   - unstable mode: uses recursive descent to match tokens one at a time,
-     token history handled by the state machine rather than storing tokens in a list
-     and only keeps track of a single state which improves performance, however
-     is hard to show correctness due to possible issues in convert to LL(1)
+   - push-down mode (default): uses a push-down automata to match tokens
+   - recursive descent mode: uses recursive descent to match tokens
 */
 
 public class Parser {
+	public static enum Mode { PushDown, RecursiveDescent }
 	private static class UnitTestData {
 		public final List<Token> tokenList;
 		public final List<String> outputLines;
@@ -57,22 +53,19 @@ public class Parser {
 
 	private Scanner scanner;
 	private ErrorReporter errors;
-	private List<Token> tokenHistory;
 	private Token currToken;
 	private boolean unitTest;
-	private boolean unstableMode;
+	private Mode mode;
 	private UnitTestData testData;
 	
-	public Parser(Scanner scanner, ErrorReporter errors, boolean unstableMode) {
+	public Parser(Scanner scanner, ErrorReporter errors, Mode mode) {
 		this.unitTest = false;
 		this.scanner = scanner;
 		this.errors = errors;
-		this.unstableMode = unstableMode;
-		tokenHistory = new ArrayList<>();
-		nextToken();
+		this.mode = mode;
 	}
 	public Parser(Scanner scanner, ErrorReporter errors) {
-		this(scanner, errors, false);
+		this(scanner, errors, Mode.PushDown);
 	}
 
 	public void enableUnitTest() {
@@ -101,8 +94,10 @@ public class Parser {
 	
 	public void parse() {
 		try {
-			if (unstableMode) parseProgram();
-			else parseGrammar();
+			switch (mode) {
+				case PushDown: parseGrammar(); break;
+				case RecursiveDescent: parseProgram(); break;
+			}
 		} catch( SyntaxError e ) { }
 	}
 
@@ -126,6 +121,7 @@ public class Parser {
 		stateQueue.add(new SymbolStack(new Symbol[] { Symbol.getSymbol(SymbolType.Program) }, 0, 0));
 		List<TokenType> expectedTerminals = new ArrayList<>();
 		while (!currTokenMatches(TokenType.End)) {
+			nextToken();
 			if (stateQueue.isEmpty()) {
 				Collections.sort(expectedTerminals);
 				String[] expectedTerminalsStrArr = new String[expectedTerminals.size()];
@@ -141,12 +137,12 @@ public class Parser {
 			for (int qi = stateQueue.size(); qi > 0; qi--) {
 				applyProductions(stateQueue, expectedTerminals, stateQueue.poll());
 			}
-			nextToken();
 		}
 	}
 	
 	// Program ::= (ClassDeclaration)* eot
 	private void parseProgram() throws SyntaxError {
+		nextToken();
 		while (currToken.getTokenType() != TokenType.End) {
 			parseClassDeclaration();
 		}
@@ -418,7 +414,6 @@ public class Parser {
 	private void nextToken() throws SyntaxError {
 		currToken = scanner.scan();
 		if (unitTest) testData.tokenList.add(currToken);
-		if (!unstableMode) tokenHistory.add(currToken);
 		if (currTokenMatches(TokenType.Error)) {
 			throw new SyntaxError();
 		}
@@ -443,6 +438,6 @@ public class Parser {
 	}
 
 	private boolean currTokenMatches(TokenType type) {
-		return currToken.getTokenType() == type;
+		return currToken != null && currToken.getTokenType() == type;
 	}
 }
