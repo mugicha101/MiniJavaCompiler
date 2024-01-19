@@ -5,13 +5,13 @@ import miniJava.ErrorReporter;
 import java.util.*;
 
 /* NOTE: Includes two different approaches
-   - stable mode: uses a context free grammar parser to match tokens,
+   - stable mode: uses a push-down automata to match tokens,
      requires a token history list and keeps track of many different possible paths at once
      which reduces performance, however is easier to show correctness
-   - unstable mode: uses a large state machine to match tokens one at a time,
+   - unstable mode: uses recursive descent to match tokens one at a time,
      token history handled by the state machine rather than storing tokens in a list
      and only keeps track of a single state which improves performance, however
-     is hard to show correctness
+     is hard to show correctness due to possible issues in convert to LL(1)
 */
 
 public class Parser {
@@ -106,52 +106,43 @@ public class Parser {
 		} catch( SyntaxError e ) { }
 	}
 
-	private class SymbolStackPriorityComparitor implements Comparator<SymbolStack> {
-		@Override
-		// prioritize stacks with maximal token index first then maximal prod count
-		public int compare(SymbolStack s1, SymbolStack s2) {
-			return s1.tokenIndex != s2.tokenIndex ? s2.tokenIndex - s1.tokenIndex : s2.prodCount - s1.prodCount;
+	private void applyProductions(Queue<SymbolStack> stateQueue, List<TokenType> expectedTerminals, SymbolStack state) {
+		Symbol top = state.top();
+		if (top.isTerminal()) {
+			if (top.getTerminalType() == currToken.getTokenType()) {
+				stateQueue.add(state.handleTerminal());
+			} else {
+				expectedTerminals.add(top.getTerminalType());
+			}
+			return;
+		}
+		for (Symbol[] prod : Symbol.getProductions(top.getSymbolType())) {
+			applyProductions(stateQueue, expectedTerminals, state.handleProduction(prod));
 		}
 	}
 
 	private void parseGrammar() throws SyntaxError {
-		Comparator<SymbolStack> comparator = new SymbolStackPriorityComparitor();
-		Queue<SymbolStack> stateQueue = new PriorityQueue<>(10, comparator);
+		Queue<SymbolStack> stateQueue = new LinkedList<>();
 		stateQueue.add(new SymbolStack(new Symbol[] { Symbol.getSymbol(SymbolType.Program) }, 0, 0));
-		HashSet<TokenType> expectedTerminals = new HashSet<>();
-		while (!stateQueue.isEmpty()) {
-			SymbolStack symbolStack = stateQueue.remove();
-			// System.out.println(symbolStack.toString());
-			if (symbolStack.stack.length == 0) return; // finished parsing
-			while (tokenHistory.get(tokenHistory.size()-1).getTokenType() != TokenType.End
-					&& symbolStack.tokenIndex >= tokenHistory.size()) {
-				nextToken();
-				expectedTerminals.clear();
-			}
-			if (symbolStack.tokenIndex >= tokenHistory.size())
-				continue;
-			TokenType nextTerminal = tokenHistory.get(symbolStack.tokenIndex).getTokenType();
-			Symbol top = symbolStack.top();
-			if (top.isTerminal()) {
-				if (top.getTerminalType() == nextTerminal) {
-					stateQueue.add(symbolStack.handleTerminal());
-				} else {
-					expectedTerminals.add(top.getTerminalType());
+		List<TokenType> expectedTerminals = new ArrayList<>();
+		while (!currTokenMatches(TokenType.End)) {
+			if (stateQueue.isEmpty()) {
+				Collections.sort(expectedTerminals);
+				String[] expectedTerminalsStrArr = new String[expectedTerminals.size()];
+				int i = 0;
+				for (TokenType token : expectedTerminals) {
+					expectedTerminalsStrArr[i++] = "{" + token.toString() + "}";
 				}
-			} else {
-				for (Symbol[] prod : Symbol.getProductions(top.getSymbolType())) {
-					stateQueue.add(symbolStack.handleProduction(prod));
-				}
+				if (expectedTerminalsStrArr.length > 1) expectedTerminalsStrArr[expectedTerminalsStrArr.length-1] = "or " + expectedTerminalsStrArr[expectedTerminalsStrArr.length-1];
+				errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Unexpected Token: Expected %s, but instead got {%s} matching the following text: \"%s\"", String.join(expectedTerminalsStrArr.length > 2 ? ", " : " ", expectedTerminalsStrArr), currToken.getTokenType(), currToken.getTokenText()));
+				throw new SyntaxError();
 			}
+			expectedTerminals.clear();
+			for (int qi = stateQueue.size(); qi > 0; qi--) {
+				applyProductions(stateQueue, expectedTerminals, stateQueue.poll());
+			}
+			nextToken();
 		}
-		String[] expectedTerminalsStrArr = new String[expectedTerminals.size()];
-		int i = 0;
-		for (TokenType token : expectedTerminals) {
-			expectedTerminalsStrArr[i++] = "{" + token.toString() + "}";
-		}
-		if (expectedTerminalsStrArr.length > 1) expectedTerminalsStrArr[expectedTerminalsStrArr.length-1] = "or " + expectedTerminalsStrArr[expectedTerminalsStrArr.length-1];
-		errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Unexpected Token: Expected %s, but instead got {%s} matching the following text: \"%s\"", String.join(expectedTerminalsStrArr.length > 2 ? ", " : " ", expectedTerminalsStrArr), currToken.getTokenType(), currToken.getTokenText()));
-		throw new SyntaxError();
 	}
 	
 	// Program ::= (ClassDeclaration)* eot
