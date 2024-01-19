@@ -1,9 +1,6 @@
 package miniJava.SyntacticAnalyzer;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 
 public class Symbol {
     private static HashMap<SymbolType, Symbol> nonTerminalSymbols = new HashMap<>();
