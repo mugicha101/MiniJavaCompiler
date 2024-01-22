@@ -250,6 +250,10 @@ public class Scanner {
 					skipCurr();
 				} break;
 				case MultiLineComment: {
+					if (currIsEnd()) {
+						errors.reportError(startLine, startOffset, "Unclosed multiline comment.");
+						return makeToken(TokenType.Error, startLine, startOffset);
+					}
 					if (currText.charAt(0) == '*' && currChar == '/') {
 						clearCurrText();
 						state = State.Unknown;
@@ -257,13 +261,13 @@ public class Scanner {
 					skipCurr();
 				} break;
 				case Token: {
-					if (currIsNewline()) {
-						state = State.TokenEnd;
-						break;
-					}
 					boolean backslash = currText.length() != 0 && currText.charAt(currText.length()-1) == '\\';
 					switch (tokenType) {
 						case Identifier: {
+							if (currIsNewline()) {
+								state = State.TokenEnd;
+								break;
+							}
 							// check for invalid identifier characters (all keywords must also comply with this)
 							if (!currIsLetter() && !currIsDigit() && currChar != '_') {
 								// check for keyword match
@@ -305,9 +309,9 @@ public class Scanner {
 						} break;
 						case StringLiteral: {
 							if (currIsNewline()) {
-								state = State.TokenEnd;
-								tokenType = TokenType.IncompleteStringLiteral;
-							} if (!backslash && currChar == '"') {
+								errors.reportError(startLine, startOffset, "Unclosed string literal.");
+								return makeToken(TokenType.Error, startLine, startOffset);
+							} else if (!backslash && currChar == '"') {
 								state = State.TokenEnd;
 								takeCurr();
 							} else {
@@ -316,15 +320,15 @@ public class Scanner {
 						} break;
 						case CharLiteral: {
 							if (currIsNewline()) {
-								state = State.TokenEnd;
-								tokenType = TokenType.IncompleteCharLiteral;
-							} if (!backslash && currChar == '\'') {
+								errors.reportError(startLine, startOffset, "Unclosed char literal.");
+								return makeToken(TokenType.Error, startLine, startOffset);
+							} else if (!backslash && currChar == '\'') {
 								state = State.TokenEnd;
 								takeCurr();
 							} else takeCurr();
 						} break;
 						default: {
-							if (currIsWhitespace()) {
+							if (currIsNewline() || currIsWhitespace()) {
 								state = State.TokenEnd;
 							} else takeCurr();
 						} break;
@@ -364,6 +368,8 @@ public class Scanner {
 	private boolean currIsLetter() {
 		return (currChar >= 'a' && currChar <= 'z') || (currChar >= 'A' && currChar <= 'Z');
 	}
+
+	private boolean currIsEnd() { return (currChar == EOF); }
 
 	private void clearCurrText() {
 		currText.setLength(0);

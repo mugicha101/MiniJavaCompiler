@@ -1,4 +1,5 @@
 ================ Tokens ================
+1:0 Class{class}
 1:6 Identifier{Keywords}
 1:15 LCurly{{}
 4:4 VoidType{void}
