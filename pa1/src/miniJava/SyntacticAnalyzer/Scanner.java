@@ -10,64 +10,38 @@ public class Scanner {
 	int line;
 	int offset;
 	final static char EOF = '\u001a';
-	private static class KeywordTrieNode {
-		private HashMap<Character, KeywordTrieNode> next = new HashMap<>();
-		private TokenType tokenType = null; // null if not end of keyword
-		private void insert(String keyword, TokenType tokenType, int index) {
-			if (index == keyword.length()) {
-				this.tokenType = tokenType;
-				return;
-			}
-			char c = keyword.charAt(index);
-			if (!next.containsKey(c))
-				next.put(c, new KeywordTrieNode());
-			next.get(c).insert(keyword, tokenType, index + 1);
-		}
-		public void insert(String keyword, TokenType tokenType) {
-			insert(keyword, tokenType, 0);
-		}
-
-		public KeywordTrieNode step(char nextChar) {
-			return next.get(nextChar);
-		}
-
-		public TokenType getTokenType() {
-			return tokenType;
-		}
-	}
 	private InputStream in;
 	private ErrorReporter errors;
 	private StringBuilder currText;
-	private static KeywordTrieNode keywordTrieRoot;
 	private char currChar;
+	private static final HashMap<String,TokenType> keywords = new HashMap<>();
 
 	static {
-		keywordTrieRoot = new KeywordTrieNode();
-		keywordTrieRoot.insert("class", TokenType.Class);
-		keywordTrieRoot.insert("this", TokenType.This);
-		keywordTrieRoot.insert("new", TokenType.New);
-		keywordTrieRoot.insert("if", TokenType.If);
-		keywordTrieRoot.insert("else", TokenType.Else);
-		keywordTrieRoot.insert("for", TokenType.For);
-		keywordTrieRoot.insert("while", TokenType.While);
-		keywordTrieRoot.insert("do", TokenType.Do);
-		keywordTrieRoot.insert("switch", TokenType.Switch);
-		keywordTrieRoot.insert("public", TokenType.Visibility);
-		keywordTrieRoot.insert("private", TokenType.Visibility);
-		keywordTrieRoot.insert("protected", TokenType.Visibility);
-		keywordTrieRoot.insert("default", TokenType.Visibility);
-		keywordTrieRoot.insert("static", TokenType.Static);
-		keywordTrieRoot.insert("void", TokenType.VoidType);
-		keywordTrieRoot.insert("boolean", TokenType.BooleanType);
-		keywordTrieRoot.insert("byte", TokenType.ByteType);
-		keywordTrieRoot.insert("char", TokenType.CharType);
-		keywordTrieRoot.insert("int", TokenType.IntType);
-		keywordTrieRoot.insert("long", TokenType.LongType);
-		keywordTrieRoot.insert("float", TokenType.FloatType);
-		keywordTrieRoot.insert("double", TokenType.DoubleType);
-		keywordTrieRoot.insert("return", TokenType.Return);
-		keywordTrieRoot.insert("true", TokenType.BooleanLiteral);
-		keywordTrieRoot.insert("false", TokenType.BooleanLiteral);
+		keywords.put("class", TokenType.Class);
+		keywords.put("this", TokenType.This);
+		keywords.put("new", TokenType.New);
+		keywords.put("if", TokenType.If);
+		keywords.put("else", TokenType.Else);
+		keywords.put("for", TokenType.For);
+		keywords.put("while", TokenType.While);
+		keywords.put("do", TokenType.Do);
+		keywords.put("switch", TokenType.Switch);
+		keywords.put("public", TokenType.Visibility);
+		keywords.put("private", TokenType.Visibility);
+		keywords.put("protected", TokenType.Visibility);
+		keywords.put("default", TokenType.Visibility);
+		keywords.put("static", TokenType.Static);
+		keywords.put("void", TokenType.VoidType);
+		keywords.put("boolean", TokenType.BooleanType);
+		keywords.put("byte", TokenType.ByteType);
+		keywords.put("char", TokenType.CharType);
+		keywords.put("int", TokenType.IntType);
+		keywords.put("long", TokenType.LongType);
+		keywords.put("float", TokenType.FloatType);
+		keywords.put("double", TokenType.DoubleType);
+		keywords.put("return", TokenType.Return);
+		keywords.put("true", TokenType.BooleanLiteral);
+		keywords.put("false", TokenType.BooleanLiteral);
 	}
 	
 	public Scanner( InputStream in, ErrorReporter errors ) {
@@ -86,7 +60,6 @@ public class Scanner {
 		clearCurrText();
 		State state = State.Unknown;
 		TokenType tokenType = TokenType.End;
-		KeywordTrieNode keywordTrieNode = keywordTrieRoot;
 		int startLine = line;
 		int startOffset = offset;
 
@@ -268,17 +241,17 @@ public class Scanner {
 								state = State.TokenEnd;
 								break;
 							}
+
 							// check for invalid identifier characters (all keywords must also comply with this)
 							if (!currIsLetter() && !currIsDigit() && currChar != '_') {
 								// check for keyword match
-								if (keywordTrieNode != null && keywordTrieNode.getTokenType() != null)
-									tokenType = keywordTrieNode.getTokenType();
+								String key = currText.toString();
+								if (currText.length() < 16 && keywords.containsKey(key))
+									tokenType = keywords.get(key);
 								state = State.TokenEnd;
 								break;
 							}
 
-							// update keyword trie
-							if (keywordTrieNode != null) keywordTrieNode = keywordTrieNode.step(currChar);
 							takeCurr();
 						} break;
 						case IntLiteral: {
