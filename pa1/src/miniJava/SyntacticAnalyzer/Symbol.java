@@ -28,7 +28,7 @@ public class Symbol {
         }
         productions.put(SymbolType.Program, new Symbol[][] {
                 { getSymbol(SymbolType.ClassDeclaration), getSymbol(SymbolType.Program) },
-                { getSymbol(TokenType.End) }
+                { getSymbol(TokenType.End), getSymbol(TokenType.ParseEnd) }
         });
         productions.put(SymbolType.ClassDeclaration, new Symbol[][] {
                 { getSymbol(TokenType.Class), getSymbol(TokenType.Identifier), getSymbol(TokenType.LCurly), getSymbol(SymbolType.MemberDeclarations), getSymbol(TokenType.RCurly) }

@@ -27,5 +27,5 @@ public enum TokenType {
     BooleanLiteral, ByteLiteral, CharLiteral, IntLiteral, LongLiteral, FloatLiteral, DoubleLiteral, StringLiteral, // literals
     LCurly, RCurly, LParen, RParen, LBracket, RBracket, // parenthesis family
     Comma, Semicolon, Colon, Dot, // misc single character tokens
-    End, Error
+    End, Error, ParseEnd
 }

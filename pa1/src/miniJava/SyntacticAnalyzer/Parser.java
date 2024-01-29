@@ -138,6 +138,16 @@ public class Parser {
 				applyProductions(stateQueue, expectedTerminals, stateQueue.poll());
 			}
 		}
+		// check state queue for valid ending
+		boolean foundEnd = false;
+		for (SymbolStack symbolStack : stateQueue) {
+			if (symbolStack.stack.length == 1 && symbolStack.top().isTerminal() && symbolStack.top().getTerminalType() == TokenType.ParseEnd)
+				foundEnd = true;
+		}
+		if (!foundEnd) {
+			errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Unexpected End of File"));
+			throw new SyntaxError();
+		}
 	}
 	
 	// Program ::= (ClassDeclaration)* eot
