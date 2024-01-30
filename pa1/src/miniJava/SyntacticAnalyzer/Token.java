@@ -1,5 +1,7 @@
 package miniJava.SyntacticAnalyzer;
 
+import miniJava.SyntacticAnalyzer.SourcePosition;
+
 public class Token {
 	private final TokenType type;
 	private final String text;
@@ -27,5 +29,8 @@ public class Token {
 
 	public int getOffset() {
 		return offset;
+	}
+	public SourcePosition getTokenPosition() {
+		return new SourcePosition(line, offset);
 	}
 }
