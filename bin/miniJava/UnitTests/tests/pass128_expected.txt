@@ -7,19 +7,18 @@
 2:10 LParen{(}
 2:11 RParen{)}
 2:12 LCurly{{}
-3:8 BooleanType{boolean}
-3:16 Identifier{x}
-3:18 AssignmentOp{=}
-3:21 LogNot{!}
-3:22 LogNot{!}
-3:23 LogNot{!}
-3:24 LogNot{!}
-3:25 LogNot{!}
-3:26 Identifier{b}
-3:27 Semicolon{;}
+3:8 IntType{int}
+3:12 Identifier{x}
+3:14 AssignmentOp{=}
+3:17 Minus{-}
+3:18 Identifier{b}
+3:20 Minus{-}
+3:22 Minus{-}
+3:24 Identifier{b}
+3:25 Semicolon{;}
 4:4 RCurly{}}
 5:0 RCurly{}}
-7:0 End{EOF}
+6:0 End{EOF}
 ================ Debug ================
 ================ Errors ================
 ======= AST Display =========================
@@ -36,19 +35,18 @@ Package
   .   .   StmtList [1]
   .   .   . VarDeclStmt
   .   .   .   VarDecl
-  .   .   .     BOOLEAN BaseType
+  .   .   .     INT BaseType
   .   .   .     "x" varname
-  .   .   .   UnaryExpr
-  .   .   .     "!" Operator
+  .   .   .   BinaryExpr
+  .   .   .     "-" Operator
   .   .   .       UnaryExpr
-  .   .   .         "!" Operator
-  .   .   .           UnaryExpr
-  .   .   .             "!" Operator
-  .   .   .               UnaryExpr
-  .   .   .                 "!" Operator
-  .   .   .                   UnaryExpr
-  .   .   .                     "!" Operator
-  .   .   .                       RefExpr
-  .   .   .                         IdRef
-  .   .   .                           "b" Identifier
+  .   .   .         "-" Operator
+  .   .   .           RefExpr
+  .   .   .             IdRef
+  .   .   .               "b" Identifier
+  .   .   .       UnaryExpr
+  .   .   .         "-" Operator
+  .   .   .           RefExpr
+  .   .   .             IdRef
+  .   .   .               "b" Identifier
 =============================================

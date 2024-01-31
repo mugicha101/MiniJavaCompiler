@@ -146,11 +146,23 @@ Package
   .   .   .         "Fizz" Identifier
   .   .   .   LiteralExpr
   .   .   .     "0" IntLiteral
-  .   .   .   RefExpr
+  .   .   .   CallExpr
   .   .   .     QualRef
   .   .   .       "toString" Identifier
   .   .   .       IdRef
   .   .   .         "Integer" Identifier
+  .   .   .     ExprList + [1]
+  .   .   .     . CallExpr
+  .   .   .     .   IdRef
+  .   .   .     .     "foo" Identifier
+  .   .   .     .   ExprList + [1]
+  .   .   .     .   . BinaryExpr
+  .   .   .     .   .   "/" Operator
+  .   .   .     .   .     LiteralExpr
+  .   .   .     .   .       "8" IntLiteral
+  .   .   .     .   .     RefExpr
+  .   .   .     .   .       IdRef
+  .   .   .     .   .         "x" Identifier
   .   .   . IfStmt
   .   .   .   BinaryExpr
   .   .   .     ">=" Operator

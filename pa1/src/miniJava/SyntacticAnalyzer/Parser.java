@@ -465,95 +465,103 @@ public class Parser {
 	//     | \( Expression \)
 	//     | num | true | false
 	//     | new ( id\(\) | int [ Expression ] | id [ Expression ] )
+	private Expression parseOptionalExpressionTerm() throws SyntaxError {
+		SourcePosition exprPos = currToken.getTokenPosition();
+		Token startToken = currToken;
+		Reference ref = parseOptionalReference();
+		if (ref != null) {
+			// ref ...
+			if (optionalAccept(TokenType.LBracket)) {
+				// ref [ expr ]
+				Expression ixExpr = parseExpression();
+				accept(TokenType.RBracket);
+				return new IxExpr(ref, ixExpr, exprPos);
+			} else if (optionalAccept(TokenType.LParen)) {
+				// ref ( argList? )
+				ExprList argList = parseOptionalArgumentList();
+				if (argList == null) argList = new ExprList();
+				accept(TokenType.RParen);
+				return new CallExpr(ref, argList, exprPos);
+			}
+			// ref
+			return new RefExpr(ref, exprPos);
+		} else if (parseOptionalUnOp() != null) {
+			// unop expr
+			Expression nestedExpr = parseOptionalExpressionTerm();
+			if (nestedExpr == null) {
+				errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected expression start after unary operator, but got %s", currToken.getTokenText()));
+				throw new SyntaxError();
+			}
+			return new UnaryExpr(new Operator(startToken), nestedExpr, exprPos);
+		} else if (optionalAccept(TokenType.LParen)) {
+			// ( expr )
+			Expression expr = parseExpression();
+			accept(TokenType.RParen);
+			return expr;
+		} else if (parseOptionalNum()) {
+			// num
+			return new LiteralExpr(new IntLiteral(startToken), exprPos);
+		} else if (optionalAccept(TokenType.BooleanLiteral)) {
+			// true | false
+			return new LiteralExpr(new BooleanLiteral(startToken), exprPos);
+		} else if (optionalAccept(TokenType.New)) {
+			// new ...
+			if (currTokenMatches(TokenType.Identifier)) {
+				ClassType type = new ClassType(new Identifier(currToken), currToken.getTokenPosition());
+				nextToken();
+				// new id ...
+				if (optionalAccept(TokenType.LParen)) {
+					// new id \( \)
+					accept(TokenType.RParen);
+					return new NewObjectExpr(type, exprPos);
+				} else if (optionalAccept(TokenType.LBracket)) {
+					// new id [ expr ]
+					Expression sizeExpr = parseExpression();
+					accept(TokenType.RBracket);
+					return new NewArrayExpr(type, sizeExpr, exprPos);
+				} else {
+					errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected ( or [ after new identifier, but got %s", currToken.getTokenText()));
+					throw new SyntaxError();
+				}
+			} else if (currTokenMatches(TokenType.IntType)) {
+				// int [ expr ]
+				BaseType type = new BaseType(TypeKind.INT, currToken.getTokenPosition());
+				nextToken();
+				accept(TokenType.LBracket);
+				Expression sizeExpr = parseExpression();
+				accept(TokenType.RBracket);
+				return new NewArrayExpr(type, sizeExpr, exprPos);
+			} else {
+				errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected [ after new int, but got %s", currToken.getTokenText()));
+				throw new SyntaxError();
+			}
+		}
+		return null;
+	}
 	private Expression parseOptionalExpression() throws SyntaxError {
-		// has doubly linked list pointers
-		class ExprChain {
+		// doubly linked list of single term expressions
+		class Term {
 			public Expression expr;
 			public int prev; // points to last non-null index in chain (-1 if none)
 			public int next; // points to next non-null index in chain (binOps.size() if none)
-			public ExprChain(Expression expr, int prev, int next) {
+			public Term(Expression expr, int prev, int next) {
 				this.expr = expr;
 				this.prev = prev;
 				this.next = next;
 			}
 		}
 
-		List<ExprChain> exprChain = new ArrayList<>();
+		List<Term> termChain = new ArrayList<>();
 		List<Operator> binOps = new ArrayList<>();
 		boolean chainHasNext = true;
 		while (chainHasNext) {
-			SourcePosition exprPos = currToken.getTokenPosition();
-			Expression expr = null;
-			Token startToken = currToken;
-			Reference ref = parseOptionalReference();
-			if (ref != null) {
-				// ref ...
-				if (optionalAccept(TokenType.LBracket)) {
-					// ref [ expr ]
-					Expression ixExpr = parseExpression();
-					accept(TokenType.RBracket);
-					expr = new IxExpr(ref, ixExpr, exprPos);
-				} else if (optionalAccept(TokenType.LParen)) {
-					// ref ( argList? )
-					ExprList argList = parseOptionalArgumentList();
-					if (argList == null) argList = new ExprList();
-					accept(TokenType.RParen);
-					expr = new CallExpr(ref, argList, exprPos);
-				}
-				// ref
-				expr = new RefExpr(ref, exprPos);
-			} else if (parseOptionalUnOp() != null) {
-				// unop expr
-				Expression nestedExpr = parseExpression();
-				expr = new UnaryExpr(new Operator(startToken), nestedExpr, exprPos);
-			} else if (optionalAccept(TokenType.LParen)) {
-				// ( expr )
-				expr = parseExpression();
-				accept(TokenType.RParen);
-			} else if (parseOptionalNum()) {
-				// num
-				expr = new LiteralExpr(new IntLiteral(startToken), exprPos);
-				// true | false
-			} else if (optionalAccept(TokenType.BooleanLiteral)) {
-				expr = new LiteralExpr(new BooleanLiteral(startToken), exprPos);
-			} else if (optionalAccept(TokenType.New)) {
-				// new ...
-				if (currTokenMatches(TokenType.Identifier)) {
-					ClassType type = new ClassType(new Identifier(currToken), currToken.getTokenPosition());
-					nextToken();
-					// new id ...
-					if (optionalAccept(TokenType.LParen)) {
-						// new id \( \)
-						accept(TokenType.RParen);
-						expr = new NewObjectExpr(type, exprPos);
-					} else if (optionalAccept(TokenType.LBracket)) {
-						// new id [ expr ]
-						Expression sizeExpr = parseExpression();
-						accept(TokenType.RBracket);
-						expr = new NewArrayExpr(type, sizeExpr, exprPos);
-					} else {
-						errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected ( or [ after new identifier, but got %s", currToken.getTokenText()));
-						throw new SyntaxError();
-					}
-				} else if (currTokenMatches(TokenType.IntType)) {
-					// int [ expr ]
-					BaseType type = new BaseType(TypeKind.INT, currToken.getTokenPosition());
-					nextToken();
-					accept(TokenType.LBracket);
-					Expression sizeExpr = parseExpression();
-					accept(TokenType.RBracket);
-					expr = new NewArrayExpr(type, sizeExpr, exprPos);
-				} else {
-					errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected [ after new int, but got %s", currToken.getTokenText()));
-					throw new SyntaxError();
-				}
-			}
-			if (expr == null) {
-				if (exprChain.isEmpty()) return null;
+			Expression term = parseOptionalExpressionTerm();
+			if (term == null) {
+				if (termChain.isEmpty()) return null;
 				errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected start of an expression following a binary operator, but got %s", currToken.getTokenText()));
 				throw new SyntaxError();
 			}
-			exprChain.add(new ExprChain(expr, exprChain.size() - 1, exprChain.size() + 1));
+			termChain.add(new Term(term, termChain.size() - 1, termChain.size() + 1));
 			Operator operator = parseOptionalBinOp();
 			if (operator == null) chainHasNext = false;
 			else binOps.add(operator);
@@ -585,24 +593,23 @@ public class Parser {
 			// merges to the left, so right index for current operator remains constant
 			// left index maintained by right element
 			int rightIndex = binOpPointer.index + 1;
-			int leftIndex = exprChain.get(rightIndex).prev;
+			int leftIndex = termChain.get(rightIndex).prev;
 
-			// merge expressions and update doubly linked list
-			ExprChain leftExpr = exprChain.get(leftIndex);
-			ExprChain rightExpr = exprChain.get(rightIndex);
+			// merge terms and update doubly linked list
+			Term leftTerm = termChain.get(leftIndex);
+			Term rightTerm = termChain.get(rightIndex);
 			Operator op = binOps.get(binOpPointer.index);
-			leftExpr.expr = new BinaryExpr(op, leftExpr.expr, rightExpr.expr, leftExpr.expr.posn);
-			leftExpr.next = rightExpr.next;
-			if (rightExpr.next != exprChain.size()) {
-				ExprChain rightRightExpr = exprChain.get(rightExpr.next);
-				rightRightExpr.prev = leftIndex;
+			leftTerm.expr = new BinaryExpr(op, leftTerm.expr, rightTerm.expr, leftTerm.expr.posn);
+			leftTerm.next = rightTerm.next;
+			if (rightTerm.next != termChain.size()) {
+				Term rightRightTerm = termChain.get(rightTerm.next);
+				rightRightTerm.prev = leftIndex;
 			}
-			exprChain.set(rightIndex, null);
-			binOps.set(binOpPointer.index, null); // FOR DEBUG
+			termChain.set(rightIndex, null);
 		}
 
-		// since merging left, first expression is the result
-		return exprChain.get(0).expr;
+		// since merging left, first term is the result
+		return termChain.get(0).expr;
 	}
 	private Expression parseExpression() throws SyntaxError {
 		Expression expr = parseOptionalExpression();
