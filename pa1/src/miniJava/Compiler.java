@@ -26,7 +26,6 @@ public class Compiler {
 			System.out.println("Error");
 			errors.outputErrors();
 		} else {
-			System.out.println("Success");
 			if (ast != null) {
 				ASTDisplay display = new ASTDisplay();
 				display.showTree(ast);
