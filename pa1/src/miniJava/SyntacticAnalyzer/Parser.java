@@ -177,7 +177,7 @@ public class Parser {
 		while (!currTokenMatches(TokenType.RCurly)) {
 			// either method or field
 			FieldDecl fieldDecl = new FieldDecl(false, false, null, null, currToken.getTokenPosition());
-			fieldDecl.isPrivate = !(currToken.getTokenText().equals("public") & optionalAccept(TokenType.Visibility));
+			fieldDecl.isPrivate = currToken.getTokenText().equals("private") & optionalAccept(TokenType.Visibility);
 			fieldDecl.isStatic = optionalAccept(TokenType.Static);
 			boolean method = false;
 			TypeDenoter typeDenoter;

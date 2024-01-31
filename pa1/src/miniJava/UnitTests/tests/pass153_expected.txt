@@ -45,7 +45,7 @@ Package
   .   "Foo" classname
   .   FieldDeclList [0]
   .   MethodDeclList [1]
-  .   . (private) MethodDecl
+  .   . (public) MethodDecl
   .   .   VOID BaseType
   .   .   "bar" methodname
   .   .   ParameterDeclList [0]

@@ -73,7 +73,7 @@ Package
   .   "Keywords" classname
   .   FieldDeclList [0]
   .   MethodDeclList [2]
-  .   . (private) MethodDecl
+  .   . (public) MethodDecl
   .   .   VOID BaseType
   .   .   "p" methodname
   .   .   ParameterDeclList [0]
