@@ -57,7 +57,7 @@ public class UnitTester {
                     terminalOutput = printCatcher.toString();
                     printCatcher.close();
                 }
-                String output = trimString(parser.getTestOutput()) + "\n" + trimString(terminalOutput);
+                String output = trimString(parser.getTestOutput() + "\n" + terminalOutput);
                 file = new File(test.expectedPath);
                 in.close();
                 in = new FileInputStream(file);
@@ -82,6 +82,14 @@ public class UnitTester {
     }
 
     private static String trimString(String string) {
-        return string.replaceAll("\r", "");
+        String[] lines = string.split("\n");
+        for (int i = 0; i < lines.length; ++i) {
+            lines[i] = lines[i].replaceAll("\r", "");
+            if (lines[i].isBlank()) lines[i] = "";
+            int s = lines[i].length()-1;
+            while (s >= 0 && lines[i].charAt(s) == ' ') --s;
+            lines[i] = lines[i].substring(0, s+1);
+        }
+        return String.join("\n", lines);
     }
 }
