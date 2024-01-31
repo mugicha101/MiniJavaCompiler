@@ -83,12 +83,12 @@ public class Scanner {
 								currText.append(' ');
 							} else { // check for "/" operator
 								state = State.TokenEnd;
-								tokenType = TokenType.ArithmeticBinOp;
+								tokenType = TokenType.Divide;
 							}
 						} break;
-						case '+': case '*': {
+						case '+': {
+							tokenType = TokenType.Add;
 							takeCurr();
-							tokenType = TokenType.ArithmeticBinOp;
 							state = State.TokenEnd;
 						} break;
 						case '-': {
@@ -96,18 +96,26 @@ public class Scanner {
 							tokenType = TokenType.Minus;
 							state = State.TokenEnd;
 						} break;
+						case '*': {
+							takeCurr();
+							tokenType = TokenType.Multiply;
+							state = State.TokenEnd;
+						} break;
 						case '=': {
 							takeCurr();
 							if (currChar == '=') {
 								takeCurr();
-								tokenType = TokenType.RelationalBinOp;
+								tokenType = TokenType.RelEq;
 							} else tokenType = TokenType.AssignmentOp;
 							state = State.TokenEnd;
 						} break;
 						case '<': case '>': {
+							char c = currChar;
 							takeCurr();
-							if (currChar == '=') takeCurr();
-							tokenType = TokenType.RelationalBinOp;
+							if (currChar == '=') {
+								takeCurr();
+								tokenType = c == '<' ? TokenType.RelLEq : TokenType.RelGEq;
+							} else tokenType = c == '<' ? TokenType.RelLT : TokenType.RelGT;
 							state = State.TokenEnd;
 						} break;
 						case '"': {
@@ -125,26 +133,26 @@ public class Scanner {
 							takeCurr();
 							if (currChar == c) {
 								takeCurr();
-								tokenType = TokenType.LogicalBinOp;
-							} else tokenType = TokenType.BitwiseBinOp;
+								tokenType = c == '&' ? TokenType.LogAnd : TokenType.LogOr;
+							} else tokenType = c == '&' ? TokenType.BitAnd : TokenType.BitOr;
 							state = State.TokenEnd;
 						} break;
 						case '!': {
 							takeCurr();
 							if (currChar == '=') {
 								takeCurr();
-								tokenType = TokenType.RelationalBinOp;
-							} else tokenType = TokenType.LogicalUnOp;
+								tokenType = TokenType.RelNEq;
+							} else tokenType = TokenType.LogNot;
 							state = State.TokenEnd;
 						} break;
 						case '^': {
 							takeCurr();
-							tokenType = TokenType.BitwiseBinOp;
+							tokenType = TokenType.BitXor;
 							state = State.TokenEnd;
 						} break;
 						case '~': {
 							takeCurr();
-							tokenType = TokenType.BitwiseUnOp;
+							tokenType = TokenType.BitComp;
 							state = State.TokenEnd;
 						} break;
 						case ',': {
@@ -314,6 +322,7 @@ public class Scanner {
 			tokenType = TokenType.Error;
 			currText.append(currChar);
 		}
+		if (tokenType == TokenType.End) currText = new StringBuilder("EOF");
 		return makeToken(tokenType, startLine, startOffset);
 	}
 	

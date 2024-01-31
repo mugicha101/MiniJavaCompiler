@@ -3,6 +3,7 @@ package miniJava.UnitTests;
 import miniJava.ErrorReporter;
 import miniJava.SyntacticAnalyzer.Parser;
 import miniJava.SyntacticAnalyzer.Scanner;
+import miniJava.AbstractSyntaxTrees.*;
 
 import java.io.*;
 import java.util.HashMap;
@@ -44,8 +45,19 @@ public class UnitTester {
                 Scanner scanner = new Scanner(in, errors);
                 Parser parser = new Parser(scanner, errors);
                 parser.enableUnitTest();
-                parser.parse();
-                String output = trimString(parser.getTestOutput());
+                AST ast = parser.parse();
+                String terminalOutput = "";
+                if (ast != null) {
+                    java.io.ByteArrayOutputStream printCatcher = new java.io.ByteArrayOutputStream();
+                    PrintStream stdOut = System.out;
+                    System.setOut(new java.io.PrintStream(printCatcher));
+                    ASTDisplay display = new ASTDisplay();
+                    display.showTree(ast);
+                    System.setOut(stdOut);
+                    terminalOutput = printCatcher.toString();
+                    printCatcher.close();
+                }
+                String output = trimString(parser.getTestOutput()) + "\n" + trimString(terminalOutput);
                 file = new File(test.expectedPath);
                 in.close();
                 in = new FileInputStream(file);

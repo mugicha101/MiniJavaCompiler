@@ -16,11 +16,42 @@
 4:8 BooleanType{boolean}
 4:16 Identifier{y}
 4:18 AssignmentOp{=}
-4:20 LogicalUnOp{!}
+4:20 LogNot{!}
 4:21 Identifier{y}
 4:22 Semicolon{;}
 5:4 RCurly{}}
 6:0 RCurly{}}
-8:0 End{}
+8:0 End{EOF}
 ================ Debug ================
 ================ Errors ================
+======= AST Display =========================
+Package
+  ClassDeclList [1]
+  . ClassDecl
+  .   "id" classname
+  .   FieldDeclList [0]
+  .   MethodDeclList [1]
+  .   . (private) MethodDecl
+  .   .   VOID BaseType
+  .   .   "p" methodname
+  .   .   ParameterDeclList [0]
+  .   .   StmtList [2]
+  .   .   . VarDeclStmt
+  .   .   .   VarDecl
+  .   .   .     INT BaseType
+  .   .   .     "x" varname
+  .   .   .   UnaryExpr
+  .   .   .     "-" Operator
+  .   .   .       RefExpr
+  .   .   .         IdRef
+  .   .   .           "b" Identifier
+  .   .   . VarDeclStmt
+  .   .   .   VarDecl
+  .   .   .     BOOLEAN BaseType
+  .   .   .     "y" varname
+  .   .   .   UnaryExpr
+  .   .   .     "!" Operator
+  .   .   .       RefExpr
+  .   .   .         IdRef
+  .   .   .           "y" Identifier
+=============================================

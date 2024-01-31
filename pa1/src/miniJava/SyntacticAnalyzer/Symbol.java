@@ -123,16 +123,25 @@ public class Symbol {
                 { getSymbol(SymbolType.Reference), getSymbol(TokenType.LBracket), getSymbol(SymbolType.Expression), getSymbol(TokenType.RBracket) }
         });
         productions.put(SymbolType.UnaryOp, new Symbol[][] {
-                { getSymbol(TokenType.BitwiseUnOp) },
-                { getSymbol(TokenType.LogicalUnOp) },
+                { getSymbol(TokenType.BitComp) },
+                { getSymbol(TokenType.LogNot) },
                 { getSymbol(TokenType.Minus) }
         });
         productions.put(SymbolType.BinaryOp, new Symbol[][] {
-                { getSymbol(TokenType.RelationalBinOp) },
-                { getSymbol(TokenType.ArithmeticBinOp) },
-                { getSymbol(TokenType.BitwiseBinOp) },
-                { getSymbol(TokenType.LogicalBinOp) },
-                { getSymbol(TokenType.Minus) }
+                { getSymbol(TokenType.Add) },
+                { getSymbol(TokenType.Minus) },
+                { getSymbol(TokenType.Multiply) },
+                { getSymbol(TokenType.Divide) },
+                { getSymbol(TokenType.RelLT) },
+                { getSymbol(TokenType.RelGT) },
+                { getSymbol(TokenType.RelLEq) },
+                { getSymbol(TokenType.RelGEq) },
+                { getSymbol(TokenType.RelEq) },
+                { getSymbol(TokenType.RelNEq) },
+                { getSymbol(TokenType.BitAnd) },
+                { getSymbol(TokenType.BitOr) },
+                { getSymbol(TokenType.LogAnd) },
+                { getSymbol(TokenType.LogOr) }
         });
         productions.put(SymbolType.Number, new Symbol[][] {
                 { getSymbol(TokenType.ByteLiteral) },

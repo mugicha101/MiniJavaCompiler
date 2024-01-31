@@ -13,7 +13,7 @@
 1:37 Identifier{args}
 1:41 RParen{)}
 1:43 LCurly{{}
-2:0 End{}
+2:0 End{EOF}
 ================ Debug ================
 ================ Errors ================
-2:0 Unexpected End of File
+2:0 Expected token RCurly, but got EOF

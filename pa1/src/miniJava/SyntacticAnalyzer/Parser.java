@@ -1,7 +1,10 @@
 package miniJava.SyntacticAnalyzer;
 
+import miniJava.AbstractSyntaxTrees.*;
+import miniJava.AbstractSyntaxTrees.Package;
 import miniJava.ErrorReporter;
 
+import javax.xml.transform.Source;
 import java.util.*;
 
 /* NOTE: Includes two different approaches
@@ -57,7 +60,7 @@ public class Parser {
 	private boolean unitTest;
 	private Mode mode;
 	private UnitTestData testData;
-	
+
 	public Parser(Scanner scanner, ErrorReporter errors, Mode mode) {
 		this.unitTest = false;
 		this.scanner = scanner;
@@ -65,7 +68,7 @@ public class Parser {
 		this.mode = mode;
 	}
 	public Parser(Scanner scanner, ErrorReporter errors) {
-		this(scanner, errors, Mode.PushDown);
+		this(scanner, errors, Mode.RecursiveDescent);
 	}
 
 	public void enableUnitTest() {
@@ -77,7 +80,7 @@ public class Parser {
 		if (!unitTest) return "unit test data collection inactive";
 		return testData.toString();
 	}
-	
+
 	static class SyntaxError extends Error {
 		private static final long serialVersionUID = -6461942006097999362L;
 	}
@@ -91,14 +94,15 @@ public class Parser {
 			System.out.println(currToken.getTokenType() + " " + currToken.getTokenText());
 		} catch (SyntaxError e) { }
 	}
-	
-	public void parse() {
+
+	public AST parse() {
 		try {
 			switch (mode) {
-				case PushDown: parseGrammar(); break;
-				case RecursiveDescent: parseProgram(); break;
+				case PushDown: parseGrammar(); return null;
+				case RecursiveDescent: return parseProgram();
 			}
 		} catch( SyntaxError e ) { }
+		return null;
 	}
 
 	private void applyProductions(Queue<SymbolStack> stateQueue, List<TokenType> expectedTerminals, SymbolStack state) {
@@ -149,88 +153,140 @@ public class Parser {
 			throw new SyntaxError();
 		}
 	}
-	
+
 	// Program ::= (ClassDeclaration)* eot
-	private void parseProgram() throws SyntaxError {
+	private Package parseProgram() throws SyntaxError {
 		nextToken();
+		Package astPackage = new Package(new ClassDeclList(), currToken.getTokenPosition());
 		while (currToken.getTokenType() != TokenType.End) {
-			parseClassDeclaration();
+			astPackage.classDeclList.add(parseClassDeclaration());
 		}
+		return astPackage;
 	}
-	
+
 	// ClassDeclaration ::= class identifier { (FieldDeclaration|MethodDeclaration)* }
 	// FieldDeclaration ::= Visibility Access Type id ;
 	// MethodDeclaration ::= Visibility Access (Type|void) id \( ParameterList? \) { Statement* }
 	// Visibility ::= (public|private)?
-	private void parseClassDeclaration() throws SyntaxError {
-		accept(TokenType.Class, TokenType.Identifier, TokenType.LCurly);
+	// Access ::= static?
+	private ClassDecl parseClassDeclaration() throws SyntaxError {
+		ClassDecl classDecl = new ClassDecl("", new FieldDeclList(), new MethodDeclList(), currToken.getTokenPosition());
+		accept(TokenType.Class);
+		classDecl.name = currToken.getTokenText();
+		accept(TokenType.Identifier, TokenType.LCurly);
 		while (!currTokenMatches(TokenType.RCurly)) {
-			optionalAccept(TokenType.Visibility);
-			parseAccess();
+			// either method or field
+			FieldDecl fieldDecl = new FieldDecl(false, false, null, null, currToken.getTokenPosition());
+			fieldDecl.isPrivate = !(currToken.getTokenText().equals("public") & optionalAccept(TokenType.Visibility));
+			fieldDecl.isStatic = optionalAccept(TokenType.Static);
 			boolean method = false;
-			if (optionalAccept(TokenType.VoidType)) {
+			TypeDenoter typeDenoter;
+			if (currTokenMatches(TokenType.VoidType)) {
+				fieldDecl.type = new BaseType(TypeKind.VOID, currToken.getTokenPosition());
+				nextToken();
 				method = true;
-			} else parseType();
+			} else fieldDecl.type = parseType();
+			fieldDecl.name = currToken.getTokenText();
 			accept(TokenType.Identifier);
-			if (!method && optionalAccept(TokenType.Semicolon))
+			if (!method && optionalAccept(TokenType.Semicolon)) {
+				classDecl.fieldDeclList.add(fieldDecl);
 				continue;
+			}
+
+			// is a method
+			MethodDecl methodDecl = new MethodDecl(fieldDecl, new ParameterDeclList(), new StatementList(), fieldDecl.posn);
 			accept(TokenType.LParen);
-			if (!currTokenMatches(TokenType.RParen)) parseParameterList();
+			if (!currTokenMatches(TokenType.RParen)) methodDecl.parameterDeclList = parseParameterList();
 			accept(TokenType.RParen, TokenType.LCurly);
-			while (parseOptionalStatement());
+			Statement statement = parseOptionalStatement();
+			while (statement != null) {
+				methodDecl.statementList.add(statement);
+				statement = parseOptionalStatement();
+			}
 			accept(TokenType.RCurly);
+			classDecl.methodDeclList.add(methodDecl);
 		}
 		accept(TokenType.RCurly);
-	}
-
-	// Access ::= static?
-	private void parseAccess() {
-		optionalAccept(TokenType.Static);
+		return classDecl;
 	}
 
 	// Type ::= int | boolean | id | (int|id)[]
-	private boolean parseOptionalType() {
-		if (optionalAccept(TokenType.BooleanType)) return true;
-		if (!optionalAccept(TokenType.IntType) && !optionalAccept(TokenType.Identifier)) {
-			return false;
+	private TypeDenoter parseOptionalType() {
+		SourcePosition typePosition = currToken.getTokenPosition();
+		if (currTokenMatches(TokenType.BooleanType)) {
+			TypeDenoter typeDenoter =  new BaseType(TypeKind.BOOLEAN, typePosition);
+			nextToken();
+			return typeDenoter;
 		}
-		if (optionalAccept(TokenType.LBracket)) accept(TokenType.RBracket);
-		return true;
+		TypeDenoter typeDenoter;
+		if (currTokenMatches(TokenType.IntType)) {
+			typeDenoter = new BaseType(TypeKind.INT, currToken.getTokenPosition());
+		} else if (currTokenMatches(TokenType.Identifier)) {
+			typeDenoter =  new ClassType(new Identifier(currToken), typePosition);
+		} else return null;
+		nextToken();
+		if (optionalAccept(TokenType.LBracket)) {
+			typeDenoter = new ArrayType(typeDenoter, typePosition);
+			accept(TokenType.RBracket);
+		}
+		return typeDenoter;
 	}
-	private void parseType() throws SyntaxError {
-		if (parseOptionalType()) return;
+
+	private TypeDenoter parseType() throws SyntaxError {
+		TypeDenoter typeDenoter = parseOptionalType();
+		if (typeDenoter != null) return typeDenoter;
 		errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected type, but got %s", currToken.getTokenText()));
 		throw new SyntaxError();
 	}
 
 	// ParameterList ::= Type id (, Type id)*
-	private void parseParameterList() throws SyntaxError {
+	private ParameterDeclList parseParameterList() throws SyntaxError {
+		ParameterDeclList parameterDeclList = new ParameterDeclList();
 		do {
-			parseType();
+			ParameterDecl parameterDecl = new ParameterDecl(null, null, currToken.getTokenPosition());
+			parameterDecl.type = parseType();
+			parameterDecl.name = currToken.getTokenText();
 			accept(TokenType.Identifier);
 		} while (optionalAccept(TokenType.Comma));
+		return parameterDeclList;
 	}
 
 	// ArgumentList ::= Expression (, Expression)*
-	private boolean parseOptionalArgumentList() throws SyntaxError {
-		if (!parseOptionalExpression()) return false;
-		while (optionalAccept(TokenType.Comma)) parseExpression();
-		return true;
+	private ExprList parseOptionalArgumentList() throws SyntaxError {
+		ExprList argList = new ExprList();
+		Expression expr = parseOptionalExpression();
+		if (expr == null) return null;
+		argList.add(expr);
+		while (optionalAccept(TokenType.Comma)) {
+			argList.add(parseExpression());
+		}
+		return argList;
 	}
-	private void parseArgumentList() throws SyntaxError {
-		if (parseOptionalArgumentList()) return;
+	private ExprList parseArgumentList() throws SyntaxError {
+		ExprList argList = parseOptionalArgumentList();
+		if (argList != null) return argList;
 		errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected expression, but got %s", currToken.getTokenText()));
 		throw new SyntaxError();
 	}
 
 	// Reference ::= id | this | Reference . id
-	private boolean parseOptionalReference() throws SyntaxError {
-		if (!optionalAccept(TokenType.Identifier) && !optionalAccept(TokenType.This)) return false;
-		while (optionalAccept(TokenType.Dot)) accept(TokenType.Identifier);
-		return true;
+	private Reference parseOptionalReference() throws SyntaxError {
+		Reference ref;
+		if (currTokenMatches(TokenType.Identifier))
+			ref = new IdRef(new Identifier(currToken), currToken.getTokenPosition());
+		else if (currTokenMatches(TokenType.This))
+			ref = new ThisRef(currToken.getTokenPosition());
+		else return null;
+		nextToken();
+		while (optionalAccept(TokenType.Dot)) {
+			ref = new QualRef(ref, new Identifier(currToken), ref.posn);
+			accept(TokenType.Identifier);
+		}
+		return ref;
 	}
-	private void parseReference() throws SyntaxError {
-		if (parseOptionalReference()) return;
+	private Reference parseReference() throws SyntaxError {
+		Reference ref = parseOptionalReference();
+		if (ref != null) return ref;
 		errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected reference, but got %s", currToken.getTokenText()));
 		throw new SyntaxError();
 	}
@@ -244,93 +300,158 @@ public class Parser {
 	//     | return Expression? ;
 	//     | if \( Expression \) Statement (else Statement)?
 	//     | while \( Expression \) Statement
-	private boolean parseOptionalStatement() {
+	private Statement parseOptionalStatement() {
+		SourcePosition stmtPos = currToken.getTokenPosition();
 		if (optionalAccept(TokenType.LCurly)) {
-			while (parseOptionalStatement());
+			StatementList stmtList = new StatementList();
+			Statement nestedStmt = parseOptionalStatement();
+			while (nestedStmt != null) {
+				stmtList.add(nestedStmt);
+				nestedStmt = parseOptionalStatement();
+			}
 			accept(TokenType.RCurly);
-			return true;
+			return new BlockStmt(stmtList, stmtPos);
 		}
 		// starting with identifier can result in either type or reference
-		if (optionalAccept(TokenType.Identifier)) {
-			boolean doAssignment = true;
+		if (currTokenMatches(TokenType.Identifier)) {
+			Token id = currToken;
+			nextToken();
 			if (optionalAccept(TokenType.LBracket)) {
-				// type if [], after reference if [expression]
-				boolean isRef = parseOptionalExpression();
+				// type if [ ], after reference if [ expr ]
+				Expression ixExpr = parseOptionalExpression();
 				accept(TokenType.RBracket);
-				if (!isRef) accept(TokenType.Identifier);
-			} else if (currTokenMatches(TokenType.Dot)) {
-				// reference
-				while (optionalAccept(TokenType.Dot)) accept(TokenType.Identifier);
-				if (optionalAccept(TokenType.LBracket)) {
-					parseExpression();
-					accept(TokenType.RBracket);
-				} else if (optionalAccept(TokenType.LParen)) {
-					doAssignment = false;
-					parseOptionalArgumentList();
-					accept(TokenType.RParen);
+				if (ixExpr == null) {
+					// id [ ] id = expr ;
+					TypeDenoter type = new ArrayType(new ClassType(new Identifier(id), id.getTokenPosition()), id.getTokenPosition());
+					Token varName = currToken;
+					accept(TokenType.Identifier);
+					accept(TokenType.AssignmentOp);
+					Expression assignExpr = parseExpression();
+					accept(TokenType.Semicolon);
+					return new VarDeclStmt(new VarDecl(type, varName.getTokenText(), varName.getTokenPosition()), assignExpr, stmtPos);
 				}
-			} else if (optionalAccept(TokenType.LParen)) {
-				// reference
-				doAssignment = false;
-				parseOptionalArgumentList();
-				accept(TokenType.RParen);
-			} else {
-				optionalAccept(TokenType.Identifier);
-			}
-			if (doAssignment) {
+				// id [ expr ] = expr ;
 				accept(TokenType.AssignmentOp);
-				parseExpression();
-			}
-			accept(TokenType.Semicolon);
-			return true;
-		}
-		if (parseOptionalType()) {
-			accept(TokenType.Identifier, TokenType.AssignmentOp);
-			parseExpression();
-			accept(TokenType.Semicolon);
-			return true;
-		}
-		if (parseOptionalReference()) {
-			if (optionalAccept(TokenType.LBracket)) {
-				parseExpression();
-				accept(TokenType.RBracket, TokenType.AssignmentOp);
-				parseExpression();
-			}
-			else if (optionalAccept(TokenType.AssignmentOp)) parseExpression();
-			else if (optionalAccept(TokenType.LParen)) {
-				parseOptionalArgumentList();
+				Expression assignExpr = parseExpression();
+				accept(TokenType.Semicolon);
+				return new IxAssignStmt(new IdRef(new Identifier(id), id.getTokenPosition()), ixExpr, assignExpr, stmtPos);
+			} else if (currTokenMatches(TokenType.Dot)) {
+				// ref = id (. ref)+
+				Reference ref = new IdRef(new Identifier(id), id.getTokenPosition());
+				while (optionalAccept(TokenType.Dot)) {
+					ref = new QualRef(ref, new Identifier(currToken), ref.posn);
+					accept(TokenType.Identifier);
+				}
+				if (optionalAccept(TokenType.LBracket)) {
+					// id (. id)+ [ expr ] = expr ;
+					Expression ixExpr = parseExpression();
+					accept(TokenType.RBracket);
+					accept(TokenType.AssignmentOp);
+					Expression assignExpr = parseExpression();
+					accept(TokenType.Semicolon);
+					return new IxAssignStmt(ref, ixExpr, assignExpr, stmtPos);
+				}
+				if (optionalAccept(TokenType.LParen)) {
+					// id (. id)+ ( argList? ) ;
+					ExprList argList = parseOptionalArgumentList();
+					if (argList == null) argList = new ExprList();
+					accept(TokenType.RParen);
+					accept(TokenType.Semicolon);
+					return new CallStmt(ref, argList, stmtPos);
+				}
+				// id (. id)+ = expr ;
+				accept(TokenType.AssignmentOp);
+				Expression assignExpr = parseExpression();
+				accept(TokenType.Semicolon);
+				return new AssignStmt(ref, assignExpr, stmtPos);
+			} else if (optionalAccept(TokenType.LParen)) {
+				// id ( argList ) ;
+				Reference ref = new IdRef(new Identifier(id), id.getTokenPosition());
+				ExprList argList = parseOptionalArgumentList();
+				if (argList == null) argList = new ExprList();
 				accept(TokenType.RParen);
-			} else {
-				errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("expected = or [ or ( after reference, but got %s", currToken.getTokenText()));
-				throw new SyntaxError();
+				accept(TokenType.Semicolon);
+				return new CallStmt(ref, argList, stmtPos);
 			}
+			// id id? = expr ;
+			Token id2 = null;
+			if (currTokenMatches(TokenType.Identifier)) {
+				id2 = currToken;
+				nextToken();
+			}
+			accept(TokenType.AssignmentOp);
+			Expression assignExpr = parseExpression();
 			accept(TokenType.Semicolon);
-			return true;
+			if (id2 == null)
+				return new AssignStmt(new IdRef(new Identifier(id), id.getTokenPosition()), assignExpr, stmtPos);
+			return new VarDeclStmt(new VarDecl(new ClassType(new Identifier(id), id.getTokenPosition()), id2.getTokenText(), id.getTokenPosition()), assignExpr, stmtPos);
+		}
+		TypeDenoter type = parseOptionalType();
+		if (type != null) {
+			// type id = expr ;
+			Token id = currToken;
+			accept(TokenType.Identifier, TokenType.AssignmentOp);
+			Expression assignExpr = parseExpression();
+			accept(TokenType.Semicolon);
+			return new VarDeclStmt(new VarDecl(type, id.getTokenText(), id.getTokenPosition()), assignExpr, stmtPos);
+		}
+		Reference ref = parseOptionalReference();
+		if (ref != null) {
+			// ref ...
+			if (optionalAccept(TokenType.LBracket)) {
+				// ref [ expr ] = expr ;
+				Expression ixExpr = parseExpression();
+				accept(TokenType.RBracket, TokenType.AssignmentOp);
+				Expression assignExpr = parseExpression();
+				accept(TokenType.Semicolon);
+				return new IxAssignStmt(ref, ixExpr, assignExpr, stmtPos);
+			} else if (optionalAccept(TokenType.AssignmentOp)) {
+				// ref = expr ;
+				Expression assignExpr = parseExpression();
+				accept(TokenType.Semicolon);
+				return new AssignStmt(ref, assignExpr, stmtPos);
+			} else if (optionalAccept(TokenType.LParen)) {
+				// ref ( argList? ) ;
+				ExprList argList = parseOptionalArgumentList();
+				if (argList == null) argList = new ExprList();
+				accept(TokenType.RParen);
+				accept(TokenType.Semicolon);
+				return new CallStmt(ref, argList, stmtPos);
+			}
+			errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("expected = or [ or ( after reference, but got %s", currToken.getTokenText()));
+			throw new SyntaxError();
 		}
 		if (optionalAccept(TokenType.Return)) {
-			parseOptionalExpression();
+			// return expr? ;
+			Expression expr = parseOptionalExpression();
 			accept(TokenType.Semicolon);
-			return true;
+			return new ReturnStmt(expr, stmtPos);
 		}
 		if (optionalAccept(TokenType.If)) {
+			// if ( expr ) stmt (else stmt)?
 			accept(TokenType.LParen);
-			parseExpression();
+			Expression condExpr = parseExpression();
 			accept(TokenType.RParen);
-			parseStatement();
-			if (optionalAccept(TokenType.Else)) parseStatement();
-			return true;
+			Statement ifBodyStmt = parseStatement();
+			if (optionalAccept(TokenType.Else)) {
+				Statement elseBodyStmt = parseStatement();
+				return new IfStmt(condExpr, ifBodyStmt, elseBodyStmt, stmtPos);
+			}
+			return new IfStmt(condExpr, ifBodyStmt, stmtPos);
 		}
 		if (optionalAccept(TokenType.While)) {
+			// while ( expr ) stmt
 			accept(TokenType.LParen);
-			parseExpression();
+			Expression condExpr = parseExpression();
 			accept(TokenType.RParen);
-			parseStatement();
-			return true;
+			Statement whileBodyStmt = parseStatement();
+			return new WhileStmt(condExpr, whileBodyStmt, stmtPos);
 		}
-		return false;
+		return null;
 	}
-	private void parseStatement() throws SyntaxError {
-		if (parseOptionalStatement()) return;
+	private Statement parseStatement() throws SyntaxError {
+		Statement stmt = parseOptionalStatement();
+		if (stmt != null) return stmt;
 		errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected start of statement, but got %s", currToken.getTokenText()));
 		throw new SyntaxError();
 	}
@@ -344,73 +465,178 @@ public class Parser {
 	//     | \( Expression \)
 	//     | num | true | false
 	//     | new ( id\(\) | int [ Expression ] | id [ Expression ] )
-	private boolean parseOptionalExpression() throws SyntaxError {
-		boolean ret = false;
-		if (parseOptionalReference()) {
-			if (optionalAccept(TokenType.LBracket)) {
-				parseExpression();
-				accept(TokenType.RBracket);
-			} else if (optionalAccept(TokenType.LParen)) {
-				parseOptionalArgumentList();
-				accept(TokenType.RParen);
+	private Expression parseOptionalExpression() throws SyntaxError {
+		// has doubly linked list pointers
+		class ExprChain {
+			public Expression expr;
+			public int prev; // points to last non-null index in chain (-1 if none)
+			public int next; // points to next non-null index in chain (binOps.size() if none)
+			public ExprChain(Expression expr, int prev, int next) {
+				this.expr = expr;
+				this.prev = prev;
+				this.next = next;
 			}
-			ret = true;
-		} else if (parseOptionalUnop()) {
-			parseExpression();
-			ret = true;
-		} else if (optionalAccept(TokenType.LParen)) {
-			parseExpression();
-			accept(TokenType.RParen);
-			ret = true;
-		} else if (parseOptionalNum() || optionalAccept(TokenType.BooleanLiteral)) {
-			ret = true;
-		} else if (optionalAccept(TokenType.New)) {
-			if (optionalAccept(TokenType.Identifier)) {
-				if (optionalAccept(TokenType.LParen)) accept(TokenType.RParen);
-				else if (optionalAccept(TokenType.LBracket)) {
-					parseExpression();
+		}
+
+		List<ExprChain> exprChain = new ArrayList<>();
+		List<Operator> binOps = new ArrayList<>();
+		boolean chainHasNext = true;
+		while (chainHasNext) {
+			SourcePosition exprPos = currToken.getTokenPosition();
+			Expression expr = null;
+			Token startToken = currToken;
+			Reference ref = parseOptionalReference();
+			if (ref != null) {
+				// ref ...
+				if (optionalAccept(TokenType.LBracket)) {
+					// ref [ expr ]
+					Expression ixExpr = parseExpression();
 					accept(TokenType.RBracket);
+					expr = new IxExpr(ref, ixExpr, exprPos);
+				} else if (optionalAccept(TokenType.LParen)) {
+					// ref ( argList? )
+					ExprList argList = parseOptionalArgumentList();
+					if (argList == null) argList = new ExprList();
+					accept(TokenType.RParen);
+					expr = new CallExpr(ref, argList, exprPos);
 				}
-				else {
-					errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected ( or [ after new identifier, but got %s", currToken.getTokenText()));
+				// ref
+				expr = new RefExpr(ref, exprPos);
+			} else if (parseOptionalUnOp() != null) {
+				// unop expr
+				Expression nestedExpr = parseExpression();
+				expr = new UnaryExpr(new Operator(startToken), nestedExpr, exprPos);
+			} else if (optionalAccept(TokenType.LParen)) {
+				// ( expr )
+				expr = parseExpression();
+				accept(TokenType.RParen);
+			} else if (parseOptionalNum()) {
+				// num
+				expr = new LiteralExpr(new IntLiteral(startToken), exprPos);
+				// true | false
+			} else if (optionalAccept(TokenType.BooleanLiteral)) {
+				expr = new LiteralExpr(new BooleanLiteral(startToken), exprPos);
+			} else if (optionalAccept(TokenType.New)) {
+				// new ...
+				if (currTokenMatches(TokenType.Identifier)) {
+					ClassType type = new ClassType(new Identifier(currToken), currToken.getTokenPosition());
+					nextToken();
+					// new id ...
+					if (optionalAccept(TokenType.LParen)) {
+						// new id \( \)
+						accept(TokenType.RParen);
+						expr = new NewObjectExpr(type, exprPos);
+					} else if (optionalAccept(TokenType.LBracket)) {
+						// new id [ expr ]
+						Expression sizeExpr = parseExpression();
+						accept(TokenType.RBracket);
+						expr = new NewArrayExpr(type, sizeExpr, exprPos);
+					} else {
+						errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected ( or [ after new identifier, but got %s", currToken.getTokenText()));
+						throw new SyntaxError();
+					}
+				} else if (currTokenMatches(TokenType.IntType)) {
+					// int [ expr ]
+					BaseType type = new BaseType(TypeKind.INT, currToken.getTokenPosition());
+					nextToken();
+					accept(TokenType.LBracket);
+					Expression sizeExpr = parseExpression();
+					accept(TokenType.RBracket);
+					expr = new NewArrayExpr(type, sizeExpr, exprPos);
+				} else {
+					errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected [ after new int, but got %s", currToken.getTokenText()));
 					throw new SyntaxError();
 				}
-			} else if (optionalAccept(TokenType.IntType)) {
-				accept(TokenType.LBracket);
-				parseExpression();
-				accept(TokenType.RBracket);
-			} else {
-				errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected [ after new int, but got %s", currToken.getTokenText()));
+			}
+			if (expr == null) {
+				if (exprChain.isEmpty()) return null;
+				errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected start of an expression following a binary operator, but got %s", currToken.getTokenText()));
 				throw new SyntaxError();
 			}
-			ret = true;
+			exprChain.add(new ExprChain(expr, exprChain.size() - 1, exprChain.size() + 1));
+			Operator operator = parseOptionalBinOp();
+			if (operator == null) chainHasNext = false;
+			else binOps.add(operator);
 		}
-		if (!ret) return false;
-		if (parseOptionalBinop()) {
-			parseExpression();
+
+		// apply operator precedence of expr (binop expr)* chain
+		class BinOpPointer {
+			public final int index;
+			public final int precedence;
+			public BinOpPointer(int index, int precedence) {
+				this.index = index;
+				this.precedence = precedence;
+			}
 		}
-		return true;
+		class BinOpOrderComparator implements Comparator<BinOpPointer> {
+			public int compare(BinOpPointer a, BinOpPointer b) {
+				return a.precedence != b.precedence ? a.precedence < b.precedence ? -1 : 1
+						: binOps.get(a.index).posn.compareTo(binOps.get(b.index).posn);
+			}
+		}
+		BinOpPointer[] binOpPointers = new BinOpPointer[binOps.size()];
+		for (int i = 0; i < binOps.size(); ++i) {
+			binOpPointers[i] = new BinOpPointer(i, Operator.binOpPrecedence.get(binOps.get(i).kind));
+		}
+		Arrays.sort(binOpPointers, new BinOpOrderComparator());
+
+		for (BinOpPointer binOpPointer : binOpPointers) {
+			// get indexes
+			// merges to the left, so right index for current operator remains constant
+			// left index maintained by right element
+			int rightIndex = binOpPointer.index + 1;
+			int leftIndex = exprChain.get(rightIndex).prev;
+
+			// merge expressions and update doubly linked list
+			ExprChain leftExpr = exprChain.get(leftIndex);
+			ExprChain rightExpr = exprChain.get(rightIndex);
+			Operator op = binOps.get(binOpPointer.index);
+			leftExpr.expr = new BinaryExpr(op, leftExpr.expr, rightExpr.expr, leftExpr.expr.posn);
+			leftExpr.next = rightExpr.next;
+			if (rightExpr.next != exprChain.size()) {
+				ExprChain rightRightExpr = exprChain.get(rightExpr.next);
+				rightRightExpr.prev = leftIndex;
+			}
+			exprChain.set(rightIndex, null);
+			binOps.set(binOpPointer.index, null); // FOR DEBUG
+		}
+
+		// since merging left, first expression is the result
+		return exprChain.get(0).expr;
 	}
-	private void parseExpression() throws SyntaxError {
-		if (parseOptionalExpression()) return;
+	private Expression parseExpression() throws SyntaxError {
+		Expression expr = parseOptionalExpression();
+		if (expr != null) return expr;
 		errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected start of expression, but got %s", currToken.getTokenText()));
 		throw new SyntaxError();
 	}
 
-	private boolean parseOptionalBinop() {
-		TokenType[] binOpTokens = { TokenType.ArithmeticBinOp, TokenType.Minus, TokenType.RelationalBinOp, TokenType.BitwiseBinOp, TokenType.LogicalBinOp };
+	private Operator parseOptionalBinOp() {
+		TokenType[] binOpTokens = {
+				TokenType.Add, TokenType.Minus, TokenType.Multiply, TokenType.Divide,
+				TokenType.RelLT, TokenType.RelGT, TokenType.RelLEq, TokenType.RelGEq, TokenType.RelEq, TokenType.RelNEq,
+				TokenType.BitAnd, TokenType.BitXor, TokenType.BitOr, TokenType.LogAnd, TokenType.LogOr
+		};
 		for (TokenType token : binOpTokens) {
-			if (optionalAccept(token)) return true;
+			if (currTokenMatches(token)) {
+				Operator op = new Operator(currToken);
+				nextToken();
+				return op;
+			}
 		}
-		return false;
+		return null;
 	}
 
-	private boolean parseOptionalUnop() {
-		TokenType[] unOpTokens = { TokenType.BitwiseUnOp, TokenType.LogicalUnOp, TokenType.Minus };
+	private Operator parseOptionalUnOp() {
+		TokenType[] unOpTokens = { TokenType.Minus, TokenType.BitComp, TokenType.LogNot };
 		for (TokenType token : unOpTokens) {
-			if (optionalAccept(token)) return true;
+			if (currTokenMatches(token)) {
+				Operator op = new Operator(currToken);
+				nextToken();
+				return op;
+			}
 		}
-		return false;
+		return null;
 	}
 
 	private boolean parseOptionalNum() {

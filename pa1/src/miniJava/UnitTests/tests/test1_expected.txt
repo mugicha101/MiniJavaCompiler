@@ -20,9 +20,9 @@
 7:29 LCurly{{}
 8:8 Return{return}
 8:15 Identifier{testVal}
-8:23 ArithmeticBinOp{+}
+8:23 Add{+}
 8:25 Identifier{val}
-8:29 ArithmeticBinOp{*}
+8:29 Multiply{*}
 8:31 IntLiteral{3}
 8:32 Semicolon{;}
 9:4 RCurly{}}
@@ -62,7 +62,7 @@
 14:44 Identifier{foo}
 14:47 LParen{(}
 14:48 IntLiteral{8}
-14:49 ArithmeticBinOp{/}
+14:49 Divide{/}
 14:50 Identifier{x}
 14:51 RParen{)}
 14:52 RParen{)}
@@ -70,7 +70,7 @@
 16:8 If{if}
 16:11 LParen{(}
 16:12 Identifier{testVal}
-16:20 RelationalBinOp{>=}
+16:20 RelGEq{>=}
 16:23 IntLiteral{9}
 16:24 RParen{)}
 16:26 LCurly{{}
@@ -86,6 +86,87 @@
 20:8 RCurly{}}
 21:4 RCurly{}}
 22:0 RCurly{}}
-22:1 End{}
+22:1 End{EOF}
 ================ Debug ================
 ================ Errors ================
+======= AST Display =========================
+Package
+  ClassDeclList [1]
+  . ClassDecl
+  .   "Test" classname
+  .   FieldDeclList [2]
+  .   . (private) FieldDecl
+  .   .   INT BaseType
+  .   .   "testVal" fieldname
+  .   . (public) FieldDecl
+  .   .   ClassType
+  .   .     "String" Identifier
+  .   .   "str1" fieldname
+  .   MethodDeclList [2]
+  .   . (private) MethodDecl
+  .   .   INT BaseType
+  .   .   "foo" methodname
+  .   .   ParameterDeclList [0]
+  .   .   StmtList [1]
+  .   .   . ReturnStmt
+  .   .   .   BinaryExpr
+  .   .   .     "+" Operator
+  .   .   .       RefExpr
+  .   .   .         IdRef
+  .   .   .           "testVal" Identifier
+  .   .   .       BinaryExpr
+  .   .   .         "*" Operator
+  .   .   .           RefExpr
+  .   .   .             IdRef
+  .   .   .               "val" Identifier
+  .   .   .           LiteralExpr
+  .   .   .             "3" IntLiteral
+  .   . (public static) MethodDecl
+  .   .   VOID BaseType
+  .   .   "main" methodname
+  .   .   ParameterDeclList [0]
+  .   .   StmtList [4]
+  .   .   . VarDeclStmt
+  .   .   .   VarDecl
+  .   .   .     INT BaseType
+  .   .   .     "x" varname
+  .   .   .   LiteralExpr
+  .   .   .     "2" IntLiteral
+  .   .   . AssignStmt
+  .   .   .   IdRef
+  .   .   .     "testVal" Identifier
+  .   .   .   LiteralExpr
+  .   .   .     "5" IntLiteral
+  .   .   . IxAssignStmt
+  .   .   .   QualRef
+  .   .   .     "arr" Identifier
+  .   .   .     QualRef
+  .   .   .       "buzz" Identifier
+  .   .   .       IdRef
+  .   .   .         "Fizz" Identifier
+  .   .   .   LiteralExpr
+  .   .   .     "0" IntLiteral
+  .   .   .   RefExpr
+  .   .   .     QualRef
+  .   .   .       "toString" Identifier
+  .   .   .       IdRef
+  .   .   .         "Integer" Identifier
+  .   .   . IfStmt
+  .   .   .   BinaryExpr
+  .   .   .     ">=" Operator
+  .   .   .       RefExpr
+  .   .   .         IdRef
+  .   .   .           "testVal" Identifier
+  .   .   .       LiteralExpr
+  .   .   .         "9" IntLiteral
+  .   .   .   BlockStmt
+  .   .   .     StatementList [1]
+  .   .   .     . ReturnStmt
+  .   .   .     .   LiteralExpr
+  .   .   .     .     "true" BooleanLiteral
+  .   .   .   BlockStmt
+  .   .   .     StatementList [1]
+  .   .   .     . ReturnStmt
+  .   .   .     .   LiteralExpr
+  .   .   .     .     "false" BooleanLiteral
+=============================================

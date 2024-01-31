@@ -12,4 +12,10 @@ public class SourcePosition {
     public String toString() {
         return String.format("%d:%d", line, offset);
     }
+
+    public int compareTo(SourcePosition other) {
+        return line != other.line ? line < other.line ? -1 : 1
+                : offset != other.offset ? offset < other.offset ? -1 : 1
+                : 0;
+    }
 }

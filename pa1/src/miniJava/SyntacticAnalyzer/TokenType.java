@@ -18,11 +18,11 @@ public enum TokenType {
     Visibility, // visibility
     Class, Static, This, Return, New, // other class/func tokens
     Identifier, // names
-    ArithmeticBinOp, Minus, // arithmetic operators (minus is both binary and unary depending on contex)
+    Add, Minus, Multiply, Divide, // arithmetic operators (minus is both binary and unary depending on context)
+    RelLT, RelGT, RelLEq, RelGEq, RelEq, RelNEq, // relational operators
+    BitAnd, BitXor, BitOr, BitComp, // bitwise operators
+    LogAnd, LogOr, LogNot, // logical operators
     AssignmentOp, // assignment operators
-    RelationalBinOp, // relational operators
-    BitwiseUnOp, BitwiseBinOp, // bitwise operators
-    LogicalBinOp, LogicalUnOp, // logical operators
     VoidType, BooleanType, ByteType, CharType, IntType, LongType, FloatType, DoubleType, // primitive types
     BooleanLiteral, ByteLiteral, CharLiteral, IntLiteral, LongLiteral, FloatLiteral, DoubleLiteral, StringLiteral, // literals
     LCurly, RCurly, LParen, RParen, LBracket, RBracket, // parenthesis family
