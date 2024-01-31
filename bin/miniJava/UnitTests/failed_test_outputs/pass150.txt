@@ -1,0 +1,47 @@
+================ Tokens ================
+1:0 Class{class}
+1:6 Identifier{MainClass}
+1:16 LCurly{{}
+2:4 Visibility{public}
+2:11 Static{static}
+2:18 VoidType{void}
+2:23 Identifier{main}
+2:28 LParen{(}
+2:29 Identifier{String}
+2:36 LBracket{[}
+2:37 RBracket{]}
+2:39 Identifier{args}
+2:43 RParen{)}
+2:45 LCurly{{}
+2:46 RCurly{}}
+3:0 RCurly{}}
+5:0 Class{class}
+5:6 Identifier{OfItsOwn}
+5:15 LCurly{{}
+6:3 IntType{int}
+6:7 Identifier{A_01}
+6:11 Semicolon{;}
+7:0 RCurly{}}
+8:0 End{EOF}
+================ Debug ================
+================ Errors ================
+======= AST Display =========================
+Package
+  ClassDeclList [2]
+  . ClassDecl
+  .   "MainClass" classname
+  .   FieldDeclList [0]
+  .   MethodDeclList [1]
+  .   . (public static) MethodDecl
+  .   .   VOID BaseType
+  .   .   "main" methodname
+  .   .   ParameterDeclList [0]
+  .   .   StmtList [0]
+  . ClassDecl
+  .   "OfItsOwn" classname
+  .   FieldDeclList [1]
+  .   . (public) FieldDecl
+  .   .   INT BaseType
+  .   .   "A_01" fieldname
+  .   MethodDeclList [0]
+=============================================

@@ -247,6 +247,7 @@ public class Parser {
 			parameterDecl.type = parseType();
 			parameterDecl.name = currToken.getTokenText();
 			accept(TokenType.Identifier);
+			parameterDeclList.add(parameterDecl);
 		} while (optionalAccept(TokenType.Comma));
 		return parameterDeclList;
 	}
