@@ -58,18 +58,25 @@ public class UnitTester {
                     printCatcher.close();
                 }
                 String output = trimString(parser.getTestOutput() + "\n" + terminalOutput);
-                file = new File(test.expectedPath);
-                in.close();
-                in = new FileInputStream(file);
+                File expectedFile = new File(test.expectedPath);
+                InputStream expectedIn = new FileInputStream(expectedFile);
                 StringBuilder expectedSb = new StringBuilder();
-                while (in.available() != 0) {
-                    expectedSb.append((char)in.read());
+                while (expectedIn.available() != 0) {
+                    expectedSb.append((char)expectedIn.read());
                 }
                 String expected = trimString(expectedSb.toString());
                 if (output.equals(expected)) {
-                    System.out.println(String.format("test %s passed", entry.getKey()));
+
+                    // timing analysis
+                    in = new FileInputStream(file);
+                    scanner = new Scanner(in, errors);
+                    parser = new Parser(scanner, errors);
+                    final long startTime = System.nanoTime();
+                    parser.parse();
+                    final long endTime = System.nanoTime();
+                    System.out.printf("test %s passed in %.3fms\n", entry.getKey(), (double)(endTime - startTime) / 1000000);
                 } else {
-                    System.err.println(String.format("test %s failed", entry.getKey()));
+                    System.err.printf("test %s failed\n", entry.getKey());
                     File errFile = new File(args[0] + "/failed_test_outputs/" + entry.getKey() + ".txt");
                     errFile.createNewFile();
                     OutputStream out = new FileOutputStream(errFile);
