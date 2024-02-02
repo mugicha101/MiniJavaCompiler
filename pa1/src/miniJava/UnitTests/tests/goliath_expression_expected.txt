@@ -1,0 +1,414 @@
+================ Tokens ================
+0:0 Class{class}
+0:6 Identifier{Test}
+0:11 LCurly{{}
+1:4 IntType{int}
+1:8 Identifier{test}
+1:12 LParen{(}
+1:13 RParen{)}
+1:15 LCurly{{}
+2:8 Return{return}
+2:15 LParen{(}
+2:16 LParen{(}
+2:17 IntLiteral{1}
+2:18 Add{+}
+2:19 IntLiteral{2}
+2:20 Multiply{*}
+2:21 IntLiteral{10}
+2:23 Divide{/}
+2:24 LParen{(}
+2:25 IntLiteral{12}
+2:27 Add{+}
+2:28 IntLiteral{15}
+2:30 RParen{)}
+2:31 Multiply{*}
+2:32 IntLiteral{100}
+2:35 Divide{/}
+2:36 IntLiteral{10}
+2:38 Add{+}
+2:39 Identifier{x}
+2:40 Multiply{*}
+2:41 IntLiteral{727}
+2:44 Add{+}
+2:45 IntLiteral{19}
+2:47 BitOr{|}
+2:48 IntLiteral{2}
+2:49 Multiply{*}
+2:50 Identifier{v}
+2:51 Add{+}
+2:52 LParen{(}
+2:53 Minus{-}
+2:54 IntLiteral{1}
+2:55 RParen{)}
+2:56 Minus{-}
+2:57 IntLiteral{9}
+2:58 RParen{)}
+2:59 Multiply{*}
+2:60 LParen{(}
+2:61 LParen{(}
+2:62 LParen{(}
+2:63 LParen{(}
+2:64 LParen{(}
+2:65 Identifier{x}
+2:66 Add{+}
+2:67 IntLiteral{8}
+2:68 Divide{/}
+2:69 LParen{(}
+2:70 LParen{(}
+2:71 LParen{(}
+2:72 LParen{(}
+2:73 LParen{(}
+2:74 Identifier{a}
+2:75 Add{+}
+2:76 Identifier{b}
+2:77 RParen{)}
+2:78 RParen{)}
+2:79 RParen{)}
+2:80 Minus{-}
+2:81 LParen{(}
+2:82 LParen{(}
+2:83 LParen{(}
+2:84 LParen{(}
+2:85 LParen{(}
+2:86 LParen{(}
+2:87 LParen{(}
+2:88 LParen{(}
+2:89 LParen{(}
+2:90 LParen{(}
+2:91 LParen{(}
+2:92 LParen{(}
+2:93 LParen{(}
+2:94 LParen{(}
+2:95 LParen{(}
+2:96 LParen{(}
+2:97 LParen{(}
+2:98 LParen{(}
+2:99 LParen{(}
+2:100 LParen{(}
+2:101 LParen{(}
+2:102 Identifier{a}
+2:103 RParen{)}
+2:104 Multiply{*}
+2:105 LParen{(}
+2:106 Identifier{b}
+2:107 RParen{)}
+2:108 Divide{/}
+2:109 LParen{(}
+2:110 Identifier{c}
+2:111 RParen{)}
+2:112 Add{+}
+2:113 LParen{(}
+2:114 Identifier{d}
+2:115 RParen{)}
+2:116 Minus{-}
+2:117 LParen{(}
+2:118 Identifier{e}
+2:119 RParen{)}
+2:120 BitOr{|}
+2:121 LParen{(}
+2:122 Identifier{f}
+2:123 RParen{)}
+2:124 Add{+}
+2:125 LParen{(}
+2:126 Identifier{g}
+2:127 RParen{)}
+2:128 LogAnd{&&}
+2:130 LParen{(}
+2:131 Identifier{h}
+2:132 RParen{)}
+2:133 RParen{)}
+2:134 RParen{)}
+2:135 RParen{)}
+2:136 RParen{)}
+2:137 RParen{)}
+2:138 RParen{)}
+2:139 RParen{)}
+2:140 RParen{)}
+2:141 RParen{)}
+2:142 RParen{)}
+2:143 RParen{)}
+2:144 RParen{)}
+2:145 RParen{)}
+2:146 RParen{)}
+2:147 RParen{)}
+2:148 RParen{)}
+2:149 RParen{)}
+2:150 RParen{)}
+2:151 RParen{)}
+2:152 RParen{)}
+2:153 RParen{)}
+2:154 RParen{)}
+2:155 RParen{)}
+2:156 RParen{)}
+2:157 RParen{)}
+2:158 RParen{)}
+2:159 Multiply{*}
+2:160 IntLiteral{3}
+2:161 Multiply{*}
+2:162 IntLiteral{3}
+2:163 Multiply{*}
+2:164 IntLiteral{3}
+2:165 RParen{)}
+2:166 RelEq{==}
+2:168 IntLiteral{0}
+2:169 LogAnd{&&}
+2:171 Identifier{a}
+2:172 Multiply{*}
+2:173 Identifier{b}
+2:174 LogOr{||}
+2:176 BooleanLiteral{true}
+2:180 RelEq{==}
+2:182 IntLiteral{1}
+2:183 RelGT{>}
+2:184 Identifier{var}
+2:187 BitAnd{&}
+2:188 IntLiteral{1}
+2:189 RParen{)}
+2:190 Multiply{*}
+2:191 IntLiteral{10}
+2:193 Add{+}
+2:194 IntLiteral{3}
+2:195 Multiply{*}
+2:196 LParen{(}
+2:197 Minus{-}
+2:198 IntLiteral{1}
+2:199 RParen{)}
+2:200 BitAnd{&}
+2:201 IntLiteral{1}
+2:202 Add{+}
+2:203 IntLiteral{3}
+2:204 Multiply{*}
+2:205 Identifier{foo}
+2:208 Multiply{*}
+2:209 Identifier{y}
+2:210 Multiply{*}
+2:211 IntLiteral{3}
+2:212 Add{+}
+2:213 Identifier{x}
+2:214 Divide{/}
+2:215 IntLiteral{2}
+2:216 Semicolon{;}
+3:4 RCurly{}}
+4:0 RCurly{}}
+4:1 End{EOF}
+================ Debug ================
+================ Errors ================
+======= AST Display =========================
+Package
+  ClassDeclList [1]
+  . ClassDecl
+  .   "Test" classname
+  .   FieldDeclList [0]
+  .   MethodDeclList [1]
+  .   . (public) MethodDecl
+  .   .   INT BaseType
+  .   .   "test" methodname
+  .   .   ParameterDeclList [0]
+  .   .   StmtList [1]
+  .   .   . ReturnStmt
+  .   .   .   BinaryExpr
+  .   .   .     "&" Operator
+  .   .   .       BinaryExpr
+  .   .   .         "+" Operator
+  .   .   .           BinaryExpr
+  .   .   .             "*" Operator
+  .   .   .               BinaryExpr
+  .   .   .                 "||" Operator
+  .   .   .                   BinaryExpr
+  .   .   .                     "&&" Operator
+  .   .   .                       BinaryExpr
+  .   .   .                         "==" Operator
+  .   .   .                           BinaryExpr
+  .   .   .                             "*" Operator
+  .   .   .                               BinaryExpr
+  .   .   .                                 "|" Operator
+  .   .   .                                   BinaryExpr
+  .   .   .                                     "+" Operator
+  .   .   .                                       BinaryExpr
+  .   .   .                                         "+" Operator
+  .   .   .                                           BinaryExpr
+  .   .   .                                             "+" Operator
+  .   .   .                                               LiteralExpr
+  .   .   .                                                 "1" IntLiteral
+  .   .   .                                               BinaryExpr
+  .   .   .                                                 "/" Operator
+  .   .   .                                                   BinaryExpr
+  .   .   .                                                     "*" Operator
+  .   .   .                                                       BinaryExpr
+  .   .   .                                                         "/" Operator
+  .   .   .                                                           BinaryExpr
+  .   .   .                                                             "*" Operator
+  .   .   .                                                               LiteralExpr
+  .   .   .                                                                 "2" IntLiteral
+  .   .   .                                                               LiteralExpr
+  .   .   .                                                                 "10" IntLiteral
+  .   .   .                                                           BinaryExpr
+  .   .   .                                                             "+" Operator
+  .   .   .                                                               LiteralExpr
+  .   .   .                                                                 "12" IntLiteral
+  .   .   .                                                               LiteralExpr
+  .   .   .                                                                 "15" IntLiteral
+  .   .   .                                                       LiteralExpr
+  .   .   .                                                         "100" IntLiteral
+  .   .   .                                                   LiteralExpr
+  .   .   .                                                     "10" IntLiteral
+  .   .   .                                           BinaryExpr
+  .   .   .                                             "*" Operator
+  .   .   .                                               RefExpr
+  .   .   .                                                 IdRef
+  .   .   .                                                   "x" Identifier
+  .   .   .                                               LiteralExpr
+  .   .   .                                                 "727" IntLiteral
+  .   .   .                                       LiteralExpr
+  .   .   .                                         "19" IntLiteral
+  .   .   .                                   BinaryExpr
+  .   .   .                                     "-" Operator
+  .   .   .                                       BinaryExpr
+  .   .   .                                         "+" Operator
+  .   .   .                                           BinaryExpr
+  .   .   .                                             "*" Operator
+  .   .   .                                               LiteralExpr
+  .   .   .                                                 "2" IntLiteral
+  .   .   .                                               RefExpr
+  .   .   .                                                 IdRef
+  .   .   .                                                   "v" Identifier
+  .   .   .                                           UnaryExpr
+  .   .   .                                             "-" Operator
+  .   .   .                                               LiteralExpr
+  .   .   .                                                 "1" IntLiteral
+  .   .   .                                       LiteralExpr
+  .   .   .                                         "9" IntLiteral
+  .   .   .                               BinaryExpr
+  .   .   .                                 "*" Operator
+  .   .   .                                   BinaryExpr
+  .   .   .                                     "*" Operator
+  .   .   .                                       BinaryExpr
+  .   .   .                                         "*" Operator
+  .   .   .                                           BinaryExpr
+  .   .   .                                             "+" Operator
+  .   .   .                                               RefExpr
+  .   .   .                                                 IdRef
+  .   .   .                                                   "x" Identifier
+  .   .   .                                               BinaryExpr
+  .   .   .                                                 "/" Operator
+  .   .   .                                                   LiteralExpr
+  .   .   .                                                     "8" IntLiteral
+  .   .   .                                                   BinaryExpr
+  .   .   .                                                     "-" Operator
+  .   .   .                                                       BinaryExpr
+  .   .   .                                                         "+" Operator
+  .   .   .                                                           RefExpr
+  .   .   .                                                             IdRef
+  .   .   .                                                               "a" Identifier
+  .   .   .                                                           RefExpr
+  .   .   .                                                             IdRef
+  .   .   .                                                               "b" Identifier
+  .   .   .                                                       BinaryExpr
+  .   .   .                                                         "&&" Operator
+  .   .   .                                                           BinaryExpr
+  .   .   .                                                             "|" Operator
+  .   .   .                                                               BinaryExpr
+  .   .   .                                                                 "-" Operator
+  .   .   .                                                                   BinaryExpr
+  .   .   .                                                                     "+" Operator
+  .   .   .                                                                       BinaryExpr
+  .   .   .                                                                         "/" Operator
+  .   .   .                                                                           BinaryExpr
+  .   .   .                                                                             "*" Operator
+  .   .   .                                                                               RefExpr
+  .   .   .                                                                                 IdRef
+  .   .   .                                                                                   "a" Identifier
+  .   .   .                                                                               RefExpr
+  .   .   .                                                                                 IdRef
+  .   .   .                                                                                   "b" Identifier
+  .   .   .                                                                           RefExpr
+  .   .   .                                                                             IdRef
+  .   .   .                                                                               "c" Identifier
+  .   .   .                                                                       RefExpr
+  .   .   .                                                                         IdRef
+  .   .   .                                                                           "d" Identifier
+  .   .   .                                                                   RefExpr
+  .   .   .                                                                     IdRef
+  .   .   .                                                                       "e" Identifier
+  .   .   .                                                               BinaryExpr
+  .   .   .                                                                 "+" Operator
+  .   .   .                                                                   RefExpr
+  .   .   .                                                                     IdRef
+  .   .   .                                                                       "f" Identifier
+  .   .   .                                                                   RefExpr
+  .   .   .                                                                     IdRef
+  .   .   .                                                                       "g" Identifier
+  .   .   .                                                           RefExpr
+  .   .   .                                                             IdRef
+  .   .   .                                                               "h" Identifier
+  .   .   .                                           LiteralExpr
+  .   .   .                                             "3" IntLiteral
+  .   .   .                                       LiteralExpr
+  .   .   .                                         "3" IntLiteral
+  .   .   .                                   LiteralExpr
+  .   .   .                                     "3" IntLiteral
+  .   .   .                           LiteralExpr
+  .   .   .                             "0" IntLiteral
+  .   .   .                       BinaryExpr
+  .   .   .                         "*" Operator
+  .   .   .                           RefExpr
+  .   .   .                             IdRef
+  .   .   .                               "a" Identifier
+  .   .   .                           RefExpr
+  .   .   .                             IdRef
+  .   .   .                               "b" Identifier
+  .   .   .                   BinaryExpr
+  .   .   .                     "&" Operator
+  .   .   .                       BinaryExpr
+  .   .   .                         "==" Operator
+  .   .   .                           LiteralExpr
+  .   .   .                             "true" BooleanLiteral
+  .   .   .                           BinaryExpr
+  .   .   .                             ">" Operator
+  .   .   .                               LiteralExpr
+  .   .   .                                 "1" IntLiteral
+  .   .   .                               RefExpr
+  .   .   .                                 IdRef
+  .   .   .                                   "var" Identifier
+  .   .   .                       LiteralExpr
+  .   .   .                         "1" IntLiteral
+  .   .   .               LiteralExpr
+  .   .   .                 "10" IntLiteral
+  .   .   .           BinaryExpr
+  .   .   .             "*" Operator
+  .   .   .               LiteralExpr
+  .   .   .                 "3" IntLiteral
+  .   .   .               UnaryExpr
+  .   .   .                 "-" Operator
+  .   .   .                   LiteralExpr
+  .   .   .                     "1" IntLiteral
+  .   .   .       BinaryExpr
+  .   .   .         "+" Operator
+  .   .   .           BinaryExpr
+  .   .   .             "+" Operator
+  .   .   .               LiteralExpr
+  .   .   .                 "1" IntLiteral
+  .   .   .               BinaryExpr
+  .   .   .                 "*" Operator
+  .   .   .                   BinaryExpr
+  .   .   .                     "*" Operator
+  .   .   .                       BinaryExpr
+  .   .   .                         "*" Operator
+  .   .   .                           LiteralExpr
+  .   .   .                             "3" IntLiteral
+  .   .   .                           RefExpr
+  .   .   .                             IdRef
+  .   .   .                               "foo" Identifier
+  .   .   .                       RefExpr
+  .   .   .                         IdRef
+  .   .   .                           "y" Identifier
+  .   .   .                   LiteralExpr
+  .   .   .                     "3" IntLiteral
+  .   .   .           BinaryExpr
+  .   .   .             "/" Operator
+  .   .   .               RefExpr
+  .   .   .                 IdRef
+  .   .   .                   "x" Identifier
+  .   .   .               LiteralExpr
+  .   .   .                 "2" IntLiteral
+=============================================
