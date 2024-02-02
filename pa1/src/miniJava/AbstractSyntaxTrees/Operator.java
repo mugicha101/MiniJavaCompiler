@@ -8,15 +8,13 @@ package miniJava.AbstractSyntaxTrees;
 import miniJava.SyntacticAnalyzer.Token;
 import miniJava.SyntacticAnalyzer.TokenType;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 public class Operator extends Terminal {
 
   public static Map<TokenType, Integer> binOpPrecedence; // low precedence = handled first
-
+  public static final int precedenceLevelCount;
   static {
     binOpPrecedence = new HashMap();
     binOpPrecedence.put(TokenType.Multiply, 0);
@@ -34,6 +32,7 @@ public class Operator extends Terminal {
     binOpPrecedence.put(TokenType.BitOr, 6);
     binOpPrecedence.put(TokenType.LogAnd, 7);
     binOpPrecedence.put(TokenType.LogOr, 8);
+    precedenceLevelCount = 9;
   }
 
   public Operator (Token t) {

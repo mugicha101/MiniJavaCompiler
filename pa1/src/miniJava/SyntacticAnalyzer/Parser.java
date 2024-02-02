@@ -569,44 +569,39 @@ public class Parser {
 		}
 
 		// apply operator precedence of expr (binop expr)* chain
-		class BinOpPointer {
-			public final int index;
-			public final int precedence;
-			public BinOpPointer(int index, int precedence) {
-				this.index = index;
-				this.precedence = precedence;
-			}
-		}
-		class BinOpOrderComparator implements Comparator<BinOpPointer> {
-			public int compare(BinOpPointer a, BinOpPointer b) {
-				return a.precedence != b.precedence ? a.precedence < b.precedence ? -1 : 1
-						: binOps.get(a.index).posn.compareTo(binOps.get(b.index).posn);
-			}
-		}
-		BinOpPointer[] binOpPointers = new BinOpPointer[binOps.size()];
+		// done in O(N) where N = number of operators
+
+		// bucket sort binOps by precedence levels
+		List<Integer>[] precedenceLevels = new ArrayList[Operator.precedenceLevelCount];
+		for (int p = 0; p < Operator.precedenceLevelCount; ++p)
+				precedenceLevels[p] = new ArrayList<>();
 		for (int i = 0; i < binOps.size(); ++i) {
-			binOpPointers[i] = new BinOpPointer(i, Operator.binOpPrecedence.get(binOps.get(i).kind));
+			precedenceLevels[Operator.binOpPrecedence.get(binOps.get(i).kind)].add(i);
 		}
-		Arrays.sort(binOpPointers, new BinOpOrderComparator());
 
-		for (BinOpPointer binOpPointer : binOpPointers) {
-			// get indexes
-			// merges to the left, so right index for current operator remains constant
-			// left index maintained by right element
-			int rightIndex = binOpPointer.index + 1;
-			int leftIndex = termChain.get(rightIndex).prev;
+		// handle binOps
+		for (int p = 0; p < Operator.precedenceLevelCount; ++p) {
+			for (int opIndex : precedenceLevels[p]) {
+				// get indexes
+				// merges to the left, so right index for current operator remains constant
+				// left index maintained by right element
+				int rightIndex = opIndex + 1;
+				int leftIndex = termChain.get(rightIndex).prev;
 
-			// merge terms and update doubly linked list
-			Term leftTerm = termChain.get(leftIndex);
-			Term rightTerm = termChain.get(rightIndex);
-			Operator op = binOps.get(binOpPointer.index);
-			leftTerm.expr = new BinaryExpr(op, leftTerm.expr, rightTerm.expr, leftTerm.expr.posn);
-			leftTerm.next = rightTerm.next;
-			if (rightTerm.next != termChain.size()) {
-				Term rightRightTerm = termChain.get(rightTerm.next);
-				rightRightTerm.prev = leftIndex;
+				// merge terms and update doubly linked list
+				Term leftTerm = termChain.get(leftIndex);
+				Term rightTerm = termChain.get(rightIndex);
+				Operator op = binOps.get(opIndex);
+				leftTerm.expr = new BinaryExpr(op, leftTerm.expr, rightTerm.expr, leftTerm.expr.posn);
+
+				// remove right term from the linked list
+				// since each op maps to a unique right term, will never be used again
+				leftTerm.next = rightTerm.next;
+				if (rightTerm.next != termChain.size()) {
+					Term rightRightTerm = termChain.get(rightTerm.next);
+					rightRightTerm.prev = leftIndex;
+				}
 			}
-			termChain.set(rightIndex, null);
 		}
 
 		// since merging left, first term is the result
