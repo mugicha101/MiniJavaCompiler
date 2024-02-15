@@ -245,13 +245,8 @@ public class Scanner {
 					boolean backslash = currText.length() != 0 && currText.charAt(currText.length()-1) == '\\';
 					switch (tokenType) {
 						case Identifier: {
-							if (currIsNewline()) {
-								state = State.TokenEnd;
-								break;
-							}
-
 							// check for invalid identifier characters (all keywords must also comply with this)
-							if (!currIsLetter() && !currIsDigit() && currChar != '_') {
+							if (currIsNewline() || (!currIsLetter() && !currIsDigit() && currChar != '_')) {
 								// check for keyword match
 								String key = currText.toString();
 								if (currText.length() < 16 && keywords.containsKey(key))
