@@ -139,7 +139,7 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
         for (Statement stmt : md.statementList) {
             lastRetType = (TypeDenoter)stmt.visit(this, arg);
         }
-        if (lastRetType == null)
+        if ((md.type == null || md.type.typeKind != TypeKind.VOID) && lastRetType == null)
             errors.reportError(md.posn, String.format("Method %s.%s has no last return statement", activeClass.name, md.name));
         arg.closeScope();
         activeMethod = null;
