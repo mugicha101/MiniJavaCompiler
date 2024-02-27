@@ -82,16 +82,20 @@ public class IdTable {
         if (classIdTable.containsKey(decl.name))
             throw new IdentificationError(decl.posn, String.format("Multiple definitions for class %s", decl.name));
         classIdTable.put(decl.name, new MemberIdTable(decl));
+        for (FieldDecl fieldDecl : decl.fieldDeclList)
+            addFieldDecl(decl.name, fieldDecl);
+        for (MethodDecl methodDecl : decl.methodDeclList)
+            addMethodDecl(decl.name, methodDecl);
     }
 
-    public void addFieldDecl(String className, FieldDecl decl) {
+    private void addFieldDecl(String className, FieldDecl decl) {
         HashMap<String, FieldDecl> fieldIdTable = classIdTable.get(className).fieldIdTable;
         if (fieldIdTable.containsKey(decl.name))
             throw new IdentificationError(decl.posn, String.format("Multiple definitions for field %s.%s", className, decl.name));
         fieldIdTable.put(decl.name, decl);
     }
 
-    public void addMethodDecl(String className, MethodDecl decl) {
+    private void addMethodDecl(String className, MethodDecl decl) {
         HashMap<String, MethodDecl> methodIdTable = classIdTable.get(className).methodIdTable;
         if (methodIdTable.containsKey(decl.name))
             throw new IdentificationError(decl.posn, String.format("Multiple definitions for method %s.%s", className, decl.name));

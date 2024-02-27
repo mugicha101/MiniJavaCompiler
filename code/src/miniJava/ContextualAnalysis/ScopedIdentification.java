@@ -20,6 +20,7 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
     static final TypeDenoter UNSUPPORTED_TYPE = new BaseType(TypeKind.UNSUPPORTED, null);
     static final TypeDenoter ERROR_TYPE = new BaseType(TypeKind.ERROR, null);
     static final TypeDenoter NULL_TYPE = new ClassType(new Identifier(new Token(TokenType.NullLiteral, "null", -1, -1)), null);
+    static final SourcePosition PREDEF_POSN = new SourcePosition(-1, -1);
     public ClassDecl activeClass;
     public MethodDecl activeMethod;
     public final ErrorReporter errors;
@@ -83,20 +84,34 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
         return null;
     }
 
+    void addPredefined(IdTable idTable) {
+        ClassDecl SystemDecl = new ClassDecl("System", new FieldDeclList(), new MethodDeclList(), PREDEF_POSN);
+        SystemDecl.fieldDeclList.add(new FieldDecl(false, true, new ClassType(new Identifier(new Token(TokenType.Identifier, "_PrintStream", PREDEF_POSN.line, PREDEF_POSN.offset)), PREDEF_POSN), "out", PREDEF_POSN));
+        ClassDecl PrintStreamDecl = new ClassDecl("_PrintStream", new FieldDeclList(), new MethodDeclList(), PREDEF_POSN);
+        PrintStreamDecl.methodDeclList.add(new MethodDecl(new FieldDecl(false, false, new BaseType(TypeKind.VOID, PREDEF_POSN), "println", PREDEF_POSN), new ParameterDeclList(), new StatementList(), PREDEF_POSN));
+        PrintStreamDecl.methodDeclList.get(0).parameterDeclList.add(new ParameterDecl(new BaseType(TypeKind.INT, PREDEF_POSN), "n", PREDEF_POSN));
+        ClassDecl StringDecl = new ClassDecl("String", new FieldDeclList(), new MethodDeclList(), PREDEF_POSN);
+        idTable.addClassDecl(SystemDecl);
+        idTable.addScopedDecl(SystemDecl);
+        idTable.addClassDecl(PrintStreamDecl);
+        idTable.addScopedDecl(PrintStreamDecl);
+        idTable.addClassDecl(StringDecl);
+        idTable.addScopedDecl(StringDecl);
+    }
+
     @Override
     public Object visitPackage(Package prog, IdTable arg) {
         activeClass = null;
         activeMethod = null;
         staticActive = 0;
 
+        // add predefined classes
+        addPredefined(arg);
+
         // resolve class decls and class member decls
         for (ClassDecl classDecl : prog.classDeclList) {
             arg.addClassDecl(classDecl);
             arg.addScopedDecl(classDecl);
-            for (FieldDecl fieldDecl : classDecl.fieldDeclList)
-                arg.addFieldDecl(classDecl.name, fieldDecl);
-            for (MethodDecl methodDecl : classDecl.methodDeclList)
-                arg.addMethodDecl(classDecl.name, methodDecl);
         }
 
         // identify
