@@ -1,6 +1,6 @@
 package miniJava.SyntacticAnalyzer;
 
-public class SourcePosition {
+public class SourcePosition implements Comparable<SourcePosition> {
     public final int line;
     public final int offset;
     public SourcePosition(int line, int offset) {
@@ -13,6 +13,7 @@ public class SourcePosition {
         return String.format("%d:%d", line, offset);
     }
 
+    @Override
     public int compareTo(SourcePosition other) {
         return line != other.line ? line < other.line ? -1 : 1
                 : offset != other.offset ? offset < other.offset ? -1 : 1

@@ -9,6 +9,8 @@ import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
 
+// TODO: use Compiler object directly to reduce redundant code
+
 public class UnitTester {
     public static class Test {
         String inputPath;

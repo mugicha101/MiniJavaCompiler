@@ -1,33 +1,55 @@
 package miniJava;
 
-import java.util.List;
-import java.util.ArrayList;
+import miniJava.SyntacticAnalyzer.SourcePosition;
+
+import java.util.*;
 
 public class ErrorReporter {
-	private List<String> errorQueue;
+	private static class ErrorEntry implements Comparable<ErrorEntry> {
+		final SourcePosition posn;
+		final String message;
+		ErrorEntry(SourcePosition posn, String message) {
+			this.posn = posn;
+			this.message = String.format("%d:%d %s", posn.line, posn.offset, message);
+		}
+
+		@Override
+		public int compareTo(ErrorEntry other) {
+			return posn.compareTo(other.posn);
+		}
+	}
+	private SortedSet<ErrorEntry> errorSet;
 	
 	public ErrorReporter() {
-		this.errorQueue = new ArrayList<String>();
+		this.errorSet = new TreeSet<ErrorEntry>();
 	}
 	
 	public boolean hasErrors() {
-		return !errorQueue.isEmpty();
+		return !errorSet.isEmpty();
 	}
 	
 	public void outputErrors() {
-		for (String error : errorQueue) {
-			System.out.println(error);
+		for (ErrorEntry error : errorSet) {
+			System.out.println(error.message);
 		}
 	}
 	
-	public void reportError(int line, int offset, String... messages) {
-		StringBuilder sb = new StringBuilder();
-		for (String m : messages)
-			sb.append(m);
-		errorQueue.add(String.format("%d:%d %s", line, offset, sb.toString()));
+	public void reportError(int line, int offset, String message) {
+		reportError(new SourcePosition(line, offset), message);
+	}
+
+	public void reportError(SourcePosition posn, String message) {
+		errorSet.add(new ErrorEntry(posn, message));
 	}
 
 	public List<String> getErrors() {
-		return new ArrayList<>(errorQueue);
+		List<String> errors = new ArrayList<>();
+		for (ErrorEntry error : errorSet)
+			errors.add(error.message);
+		return errors;
+	}
+
+	public void clear() {
+		errorSet.clear();
 	}
 }
