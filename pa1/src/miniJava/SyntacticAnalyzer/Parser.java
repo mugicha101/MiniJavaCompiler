@@ -505,6 +505,9 @@ public class Parser {
 		} else if (optionalAccept(TokenType.BooleanLiteral)) {
 			// true | false
 			return new LiteralExpr(new BooleanLiteral(startToken), exprPos);
+		} else if (optionalAccept(TokenType.NullLiteral)) {
+			// null
+			return new LiteralExpr(new NullLiteral(startToken), exprPos);
 		} else if (optionalAccept(TokenType.New)) {
 			// new ...
 			if (currTokenMatches(TokenType.Identifier)) {

@@ -24,7 +24,7 @@ public enum TokenType {
     LogAnd, LogOr, LogNot, // logical operators
     AssignmentOp, // assignment operators
     VoidType, BooleanType, ByteType, CharType, IntType, LongType, FloatType, DoubleType, // primitive types
-    BooleanLiteral, ByteLiteral, CharLiteral, IntLiteral, LongLiteral, FloatLiteral, DoubleLiteral, StringLiteral, // literals
+    BooleanLiteral, ByteLiteral, CharLiteral, IntLiteral, LongLiteral, FloatLiteral, DoubleLiteral, StringLiteral, NullLiteral, // literals
     LCurly, RCurly, LParen, RParen, LBracket, RBracket, // parenthesis family
     Comma, Semicolon, Colon, Dot, // misc single character tokens
     End, Error, ParseEnd

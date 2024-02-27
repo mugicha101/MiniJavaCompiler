@@ -42,6 +42,7 @@ public class Scanner {
 		keywords.put("return", TokenType.Return);
 		keywords.put("true", TokenType.BooleanLiteral);
 		keywords.put("false", TokenType.BooleanLiteral);
+		keywords.put("null", TokenType.NullLiteral);
 	}
 	
 	public Scanner( InputStream in, ErrorReporter errors ) {

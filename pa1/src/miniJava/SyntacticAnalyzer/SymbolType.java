@@ -26,5 +26,5 @@ public enum SymbolType {
     Statements,
     IdentifierOrThis,
     ExpressionTerminator,
-    ReferenceIdRepeat
+    ReferenceIdRepeat,
 }
