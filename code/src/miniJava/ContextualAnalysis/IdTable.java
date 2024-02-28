@@ -21,7 +21,7 @@ public class IdTable {
 
     public static class DeclScopeHandler {
         private final List<Declaration> declList = new ArrayList<>(); // list of decls in increasing scope nesting order
-        private final List<Integer> scopeLevelList = new ArrayList<>(); // list of scope levels
+        private final List<Integer> scopeLevelList = new ArrayList<>(1); // list of scope levels
 
         public DeclScopeHandler() {}
 
@@ -34,8 +34,9 @@ public class IdTable {
         }
 
         public void push(Declaration decl, int scopeLevel) throws IdentificationError {
-            if (!scopeLevelList.isEmpty() && scopeLevelList.get(scopeLevelList.size()-1) == scopeLevel)
+            if (!scopeLevelList.isEmpty() && scopeLevelList.get(scopeLevelList.size()-1) == scopeLevel) {
                 throw new IdentificationError(decl.posn, String.format("Multiple definitions for variable %s", decl.name));
+            }
             declList.add(decl);
             scopeLevelList.add(scopeLevel);
         }
@@ -55,7 +56,9 @@ public class IdTable {
     private final Stack<List<String>> idStack = new Stack<>();
     private int scopeLevel = 0;
 
-    public IdTable() {}
+    public IdTable() {
+        idStack.push(new ArrayList<>());
+    }
 
     void openScope() {
         idStack.push(new ArrayList<>());
@@ -76,6 +79,7 @@ public class IdTable {
         if (!idTable.containsKey(decl.name))
             idTable.put(decl.name, new DeclScopeHandler());
         idTable.get(decl.name).push(decl, scopeLevel);
+        idStack.lastElement().add(decl.name);
     }
 
     public void addClassDecl(ClassDecl decl) {
