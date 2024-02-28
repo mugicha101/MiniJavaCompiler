@@ -342,15 +342,15 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
         }
     }
 
-    void checkIsFieldOrVarDecl(SourcePosition posn, Declaration decl) {
-        if (!(decl instanceof FieldDecl) && !(decl instanceof MethodDecl))
-            throw new IdentificationError(posn, String.format("%s is not a variable or field", decl.name));
+    void checkIsTyped(SourcePosition posn, Declaration decl) {
+        if (!(decl instanceof FieldDecl) && !(decl instanceof MethodDecl) && !(decl instanceof ParameterDecl))
+            throw new IdentificationError(posn, String.format("%s has no type", decl.name));
     }
 
     @Override
     public Object visitRefExpr(RefExpr expr, IdTable arg) {
         Declaration decl = (Declaration)expr.ref.visit(this, arg);
-        checkIsFieldOrVarDecl(expr.ref.posn, decl);
+        checkIsTyped(expr.ref.posn, decl);
         return decl.type;
     }
 
@@ -358,7 +358,7 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
     public Object visitIxExpr(IxExpr expr, IdTable arg) {
         TypeDenoter ixType = (TypeDenoter) expr.ixExpr.visit(this, arg);
         Declaration refDecl = (Declaration) expr.ref.visit(this, arg);
-        checkIsFieldOrVarDecl(expr.ref.posn, refDecl);
+        checkIsTyped(expr.ref.posn, refDecl);
         checkTypeMatch("array index", expr.posn, ixType, INT_TYPE);
         if (refDecl.type == null || refDecl.type.typeKind != TypeKind.ARRAY) {
             throw new IdentificationError(expr.posn, String.format("%s is not an array", typeStr(refDecl.type)));
