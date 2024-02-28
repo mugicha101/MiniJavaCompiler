@@ -137,6 +137,7 @@ public class Matcher implements Visitor<IdTable, Object> {
             fieldDecl.visit(this, arg);
         for (MethodDecl methodDecl : cd.methodDeclList)
             methodDecl.visit(this, arg);
+
         arg.closeScope();
         activeClass = null;
         return null;
