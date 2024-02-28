@@ -330,13 +330,13 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
     @Override
     public Object visitIxExpr(IxExpr expr, IdTable arg) {
         TypeDenoter ixType = (TypeDenoter)expr.ixExpr.visit(this, arg);
-        TypeDenoter refType = (TypeDenoter)expr.ref.visit(this, arg);
+        Declaration refDecl = (Declaration) expr.ref.visit(this, arg);
         checkTypeMatch("array index", expr.posn, ixType, INT_TYPE);
-        if (refType.typeKind != TypeKind.ARRAY) {
-            errors.reportError(expr.posn, String.format("Type mismatch in array index reference expression: %s is not an array", typeStr(refType)));
+        if (refDecl.type == null || refDecl.type.typeKind != TypeKind.ARRAY) {
+            errors.reportError(expr.posn, String.format("Type mismatch in array index reference expression: %s is not an array", typeStr(refDecl.type)));
             return ERROR_TYPE;
         }
-        return ((ArrayType)refType).eltType;
+        return ((ArrayType)refDecl.type).eltType;
     }
 
     @Override
