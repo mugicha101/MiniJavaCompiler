@@ -1,3 +1,4 @@
 Added NullLiteral class extending Terminal
 Added visitNullLiteral in Visitor
 Implemented visitNullLiteral in ASTDisplay
+Add decl to Identifier

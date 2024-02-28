@@ -177,7 +177,7 @@ public class Matcher implements Visitor<IdTable, Object> {
     @Override
     public Object visitVarDecl(VarDecl decl, IdTable arg) {
         arg.addScopedDecl(decl);
-        return decl.type;
+        return decl.type.visit(this, arg);
     }
 
     @Override
@@ -432,8 +432,9 @@ public class Matcher implements Visitor<IdTable, Object> {
         ClassDecl classDecl = arg.getClassDecl(ref.posn, className);
         boolean isActiveClass = className.equals(activeClass.name);
 
-        // find id in ref
+        // find id in ref (don't call visit on id to avoid scope check)
         MemberDecl decl = arg.getClassMember(ref.id.posn, classDecl.name, ref.id.spelling);
+        ref.id.decl = decl;
         if (isClass && !decl.isStatic)
             throw new IdentificationError(ref.id.posn, String.format("Cannot non-static member %s from class %s", decl.name, className));
         if (decl.isPrivate && !isActiveClass)
@@ -443,7 +444,8 @@ public class Matcher implements Visitor<IdTable, Object> {
 
     @Override
     public Object visitIdentifier(Identifier id, IdTable arg) {
-        return arg.getScopedDecl(id.posn, id.spelling);
+        id.decl = arg.getScopedDecl(id.posn, id.spelling);
+        return id.decl;
     }
 
     @Override
