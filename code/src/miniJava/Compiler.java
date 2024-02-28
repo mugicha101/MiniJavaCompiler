@@ -25,7 +25,8 @@ public class Compiler {
 		Parser parser = new Parser(scanner, errors);
 		Matcher matcher = new Matcher(errors);
 		AST ast = parser.parse();
-		if (ast != null) matcher.match((Package)ast);
+		if (ast != null)
+			matcher.match((Package)ast);
 		if (errors.hasErrors()) {
 			System.out.println("Error");
 			errors.outputErrors();

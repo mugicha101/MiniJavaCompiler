@@ -22,6 +22,7 @@ public class IdTable {
     public static class DeclScopeHandler {
         private final List<Declaration> declList = new ArrayList<>(); // list of decls in increasing scope nesting order
         private final List<Integer> scopeLevelList = new ArrayList<>(1); // list of scope levels
+        public boolean locked; // true if currently being defined
 
         public DeclScopeHandler() {}
 
@@ -35,7 +36,7 @@ public class IdTable {
 
         public void push(Declaration decl, int scopeLevel) throws IdentificationError {
             if (!scopeLevelList.isEmpty() && scopeLevelList.get(scopeLevelList.size()-1) == scopeLevel) {
-                throw new IdentificationError(decl.posn, String.format("Multiple definitions for variable %s", decl.name));
+                throw new IdentificationError(decl.posn, String.format("Multiple definitions for identifier %s", decl.name));
             }
             declList.add(decl);
             scopeLevelList.add(scopeLevel);
@@ -108,8 +109,11 @@ public class IdTable {
 
     public Declaration getScopedDecl(SourcePosition posn, String name) {
         if (!idTable.containsKey(name))
-            throw new IdentificationError(posn, String.format("Undeclared variable %s", name));
-        return idTable.get(name).getLast();
+            throw new IdentificationError(posn, String.format("Undeclared identifier %s", name));
+        DeclScopeHandler handler = idTable.get(name);
+        if (handler.locked)
+            throw new IdentificationError(posn, String.format("Cannot reference variable %s within its declaration statement", name));
+        return handler.getLast();
     }
 
     public MemberDecl getClassMember(SourcePosition posn, String className, String memberName) {
@@ -145,5 +149,14 @@ public class IdTable {
         if (!memberIdTable.methodIdTable.containsKey(methodName))
             throw new IdentificationError(posn, String.format("Undeclared method %s.%s", className, methodName));
         return memberIdTable.methodIdTable.get(methodName);
+    }
+
+    // lock/unlock var decl methods assume variable already added to scope
+    public void lockVarDecl(VarDecl decl) {
+        idTable.get(decl.name).locked = true;
+    }
+
+    public void unlockVarDecl(VarDecl decl) {
+        idTable.get(decl.name).locked = false;
     }
 }

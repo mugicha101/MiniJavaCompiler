@@ -18,7 +18,6 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
     static final TypeDenoter INT_TYPE = new BaseType(TypeKind.INT, null);
     static final TypeDenoter BOOLEAN_TYPE = new BaseType(TypeKind.BOOLEAN, null);
     static final TypeDenoter UNSUPPORTED_TYPE = new BaseType(TypeKind.UNSUPPORTED, null);
-    static final TypeDenoter ERROR_TYPE = new BaseType(TypeKind.ERROR, null);
     static final TypeDenoter NULL_TYPE = new ClassType(new Identifier(new Token(TokenType.NullLiteral, "null", -1, -1)), null);
     static final SourcePosition PREDEF_POSN = new SourcePosition(-1, -1);
     public ClassDecl activeClass;
@@ -132,6 +131,8 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
             arg.addScopedDecl(methodDecl);
 
         // identify
+        for (FieldDecl fieldDecl : cd.fieldDeclList)
+            fieldDecl.visit(this, arg);
         for (MethodDecl methodDecl : cd.methodDeclList)
             methodDecl.visit(this, arg);
         arg.closeScope();
@@ -141,12 +142,14 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
 
     @Override
     public Object visitFieldDecl(FieldDecl fd, IdTable arg) {
-        throw new RuntimeException("Should not visit");
+        fd.type.visit(this, arg);
+        return null;
     }
 
     @Override
     public Object visitMethodDecl(MethodDecl md, IdTable arg) {
         activeMethod = md;
+        md.type.visit(this, arg);
         arg.openScope();
         for (ParameterDecl pd : md.parameterDeclList)
             pd.visit(this, arg);
@@ -154,7 +157,7 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
         for (Statement stmt : md.statementList) {
             lastRetType = (TypeDenoter)stmt.visit(this, arg);
         }
-        if ((md.type == null || md.type.typeKind != TypeKind.VOID) && lastRetType == null)
+        if (md.type.typeKind != TypeKind.VOID && lastRetType == null)
             errors.reportError(md.posn, String.format("Method %s.%s has no last return statement", activeClass.name, md.name));
         arg.closeScope();
         activeMethod = null;
@@ -164,7 +167,7 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
     @Override
     public Object visitParameterDecl(ParameterDecl pd, IdTable arg) {
         arg.addScopedDecl(pd);
-        return pd.type;
+        return pd.type.visit(this, arg);
     }
 
     @Override
@@ -180,12 +183,14 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
 
     @Override
     public Object visitClassType(ClassType type, IdTable arg) {
+        arg.getClassDecl(type.posn, type.className.spelling);
         return type;
     }
 
     @Override
     public Object visitArrayType(ArrayType type, IdTable arg) {
-        throw new RuntimeException("Should not visit");
+        type.eltType.visit(this, arg);
+        return type;
     }
 
     @Override
@@ -199,8 +204,10 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
 
     @Override
     public Object visitVardeclStmt(VarDeclStmt stmt, IdTable arg) {
-        TypeDenoter exprType = (TypeDenoter)stmt.initExp.visit(this, arg);
         TypeDenoter declType = (TypeDenoter)stmt.varDecl.visit(this, arg);
+        arg.lockVarDecl(stmt.varDecl);
+        TypeDenoter exprType = (TypeDenoter)stmt.initExp.visit(this, arg);
+        arg.unlockVarDecl(stmt.varDecl);
         checkTypeMatch("variable declaration", stmt.posn, exprType, declType);
         return null;
     }
@@ -228,9 +235,16 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
         return null;
     }
 
+    void checkIsCallable(SourcePosition posn, Declaration decl) {
+        if (!(decl instanceof MethodDecl))
+            throw new IdentificationError(posn, String.format("%s is not callable", decl.name));
+    }
+
     @Override
     public Object visitCallStmt(CallStmt stmt, IdTable arg) {
-        MethodDecl methodDecl = (MethodDecl)stmt.methodRef.visit(this, arg);
+        Declaration decl = (Declaration)stmt.methodRef.visit(this, arg);
+        checkIsCallable(stmt.methodRef.posn, decl);
+        MethodDecl methodDecl = (MethodDecl)decl;
         boolean sizeMatch = methodDecl.parameterDeclList.size() == stmt.argList.size();
         if (!sizeMatch)
             errors.reportError(stmt.posn, String.format("Called method %s with %d arguments but expected %d arguments", methodDecl.name, stmt.argList.size(), methodDecl.parameterDeclList.size()));
@@ -254,17 +268,20 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
         return retType;
     }
 
+    void checkIsolatedVarDeclStmt(Statement stmt) {
+        if (stmt instanceof VarDeclStmt)
+            throw new IdentificationError(stmt.posn, String.format("Variable %s defined in isolation", ((VarDeclStmt)stmt).varDecl.name));
+    }
+
     @Override
     public Object visitIfStmt(IfStmt stmt, IdTable arg) {
         TypeDenoter condType = (TypeDenoter)stmt.cond.visit(this, arg);
         checkTypeMatch("if statement condition", stmt.posn, condType, BOOLEAN_TYPE);
-        arg.openScope();
+        checkIsolatedVarDeclStmt(stmt.thenStmt);
         stmt.thenStmt.visit(this, arg);
-        arg.closeScope();
         if (stmt.elseStmt != null) {
-            arg.openScope();
+            checkIsolatedVarDeclStmt(stmt.elseStmt);
             stmt.elseStmt.visit(this, arg);
-            arg.closeScope();
         }
         return null;
     }
@@ -273,9 +290,8 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
     public Object visitWhileStmt(WhileStmt stmt, IdTable arg) {
         TypeDenoter condType = (TypeDenoter)stmt.cond.visit(this, arg);
         checkTypeMatch("while statement condition", stmt.posn, condType, BOOLEAN_TYPE);
-        arg.openScope();
+        checkIsolatedVarDeclStmt(stmt.body);
         stmt.body.visit(this, arg);
-        arg.closeScope();
         return null;
     }
 
@@ -326,26 +342,35 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
         }
     }
 
+    void checkIsNotMethod(SourcePosition posn, Declaration decl) {
+        if (decl instanceof MethodDecl)
+            throw new IdentificationError(posn, String.format("%s is not a variable or field", decl.name));
+    }
+
     @Override
     public Object visitRefExpr(RefExpr expr, IdTable arg) {
-        return ((Declaration)expr.ref.visit(this, arg)).type;
+        Declaration decl = (Declaration)expr.ref.visit(this, arg);
+        checkIsNotMethod(expr.ref.posn, decl);
+        return decl.type;
     }
 
     @Override
     public Object visitIxExpr(IxExpr expr, IdTable arg) {
-        TypeDenoter ixType = (TypeDenoter)expr.ixExpr.visit(this, arg);
+        TypeDenoter ixType = (TypeDenoter) expr.ixExpr.visit(this, arg);
         Declaration refDecl = (Declaration) expr.ref.visit(this, arg);
+        checkIsNotMethod(expr.ref.posn, refDecl);
         checkTypeMatch("array index", expr.posn, ixType, INT_TYPE);
         if (refDecl.type == null || refDecl.type.typeKind != TypeKind.ARRAY) {
-            errors.reportError(expr.posn, String.format("Type mismatch in array index reference expression: %s is not an array", typeStr(refDecl.type)));
-            return ERROR_TYPE;
+            throw new IdentificationError(expr.posn, String.format("%s is not an array", typeStr(refDecl.type)));
         }
-        return ((ArrayType)refDecl.type).eltType;
+        return ((ArrayType) refDecl.type).eltType;
     }
 
     @Override
     public Object visitCallExpr(CallExpr expr, IdTable arg) {
-        MethodDecl methodDecl = (MethodDecl)expr.functionRef.visit(this, arg);
+        Declaration decl = (Declaration) expr.functionRef.visit(this, arg);
+        checkIsCallable(expr.functionRef.posn, decl);
+        MethodDecl methodDecl = (MethodDecl)decl;
         boolean sizeMatch = methodDecl.parameterDeclList.size() == expr.argList.size();
         if (!sizeMatch)
             errors.reportError(expr.posn, String.format("Called method %s with %d arguments but expected %d arguments", methodDecl.name, expr.argList.size(), methodDecl.parameterDeclList.size()));
@@ -392,9 +417,11 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
     public Object visitQRef(QualRef ref, IdTable arg) {
         // get ref info
         Declaration refDecl = (Declaration)ref.ref.visit(this, arg);
+        if (refDecl instanceof MethodDecl)
+            throw new IdentificationError(ref.posn, String.format("Cannot access members of method %s", refDecl.name));
         String className = getClassName(refDecl);
         if (className == null)
-            throw new IdentificationError(ref.posn, String.format("Expected class or object type, but got %s", typeStr(refDecl.type)));
+            throw new IdentificationError(ref.posn, String.format("Cannot access members of base type %s", typeStr(refDecl.type)));
         boolean isClass = refDecl instanceof ClassDecl;
         ClassDecl classDecl = arg.getClassDecl(ref.posn, className);
 
