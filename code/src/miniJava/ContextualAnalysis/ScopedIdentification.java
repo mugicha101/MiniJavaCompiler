@@ -318,7 +318,7 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
                 return INT_TYPE;
             case RelEq: case RelNEq:
                 checkTypeMatch(ctmRightContext, expr.posn, rightType, leftType);
-                return leftType;
+                return BOOLEAN_TYPE;
             default:
                 checkTypeMatch(ctmLeftContext, expr.posn, leftType, UNSUPPORTED_TYPE);
                 checkTypeMatch(ctmRightContext, expr.posn, rightType, UNSUPPORTED_TYPE);
