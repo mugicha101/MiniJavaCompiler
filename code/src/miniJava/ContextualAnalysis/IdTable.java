@@ -78,7 +78,7 @@ public class IdTable {
     public void addScopedDecl(Declaration decl) {
         if (!idTable.containsKey(decl.name))
             idTable.put(decl.name, new DeclScopeHandler());
-        idTable.get(decl.name).push(decl, scopeLevel);
+        idTable.get(decl.name).push(decl, Math.min(scopeLevel, 2));
         idStack.lastElement().add(decl.name);
     }
 
