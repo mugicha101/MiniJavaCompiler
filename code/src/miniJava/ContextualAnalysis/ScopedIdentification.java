@@ -433,7 +433,7 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
             throw new IdentificationError(ref.id.posn, String.format("Cannot non-static member %s from class %s", decl.name, className));
         if (!isClass && decl.isStatic)
             throw new IdentificationError(ref.id.posn, String.format("Cannot access static member %s from instance of class %s", decl.name, className));
-        if (decl.isPrivate)
+        if (decl.isPrivate && !className.equals(activeClass.name))
             throw new IdentificationError(ref.id.posn, String.format("%s.%s is private", className, decl.name));
         return decl;
     }
