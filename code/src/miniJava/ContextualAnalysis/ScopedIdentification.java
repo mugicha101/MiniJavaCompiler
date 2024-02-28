@@ -343,7 +343,7 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
     }
 
     void checkIsTyped(SourcePosition posn, Declaration decl) {
-        if (!(decl instanceof FieldDecl) && !(decl instanceof MethodDecl) && !(decl instanceof ParameterDecl))
+        if (!(decl instanceof FieldDecl) && !(decl instanceof VarDecl) && !(decl instanceof ParameterDecl))
             throw new IdentificationError(posn, String.format("%s has no type", decl.name));
     }
 
