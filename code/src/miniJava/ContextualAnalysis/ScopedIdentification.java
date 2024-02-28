@@ -7,8 +7,6 @@ import miniJava.SyntacticAnalyzer.SourcePosition;
 import miniJava.SyntacticAnalyzer.Token;
 import miniJava.SyntacticAnalyzer.TokenType;
 
-// TODO: static scope checking
-
 // references return Declaration
 // identifiers return Declaration
 // expressions return TypeDenoter
@@ -23,7 +21,7 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
     public ClassDecl activeClass;
     public MethodDecl activeMethod;
     public final ErrorReporter errors;
-    int staticActive;
+    boolean staticActive;
     public ScopedIdentification(ErrorReporter errors) {
         this.errors = errors;
     }
@@ -102,7 +100,7 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
     public Object visitPackage(Package prog, IdTable arg) {
         activeClass = null;
         activeMethod = null;
-        staticActive = 0;
+        staticActive = false;
 
         // add predefined classes
         addPredefined(arg);
@@ -150,6 +148,7 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
     public Object visitMethodDecl(MethodDecl md, IdTable arg) {
         activeMethod = md;
         md.type.visit(this, arg);
+        staticActive = md.isStatic;
         arg.openScope();
         for (ParameterDecl pd : md.parameterDeclList)
             pd.visit(this, arg);
@@ -161,6 +160,7 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
             errors.reportError(md.posn, String.format("Method %s.%s has no last return statement", activeClass.name, md.name));
         arg.closeScope();
         activeMethod = null;
+        staticActive = false;
         return null;
     }
 
@@ -405,6 +405,8 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
 
     @Override
     public Object visitThisRef(ThisRef ref, IdTable arg) {
+        if (staticActive)
+            throw new IdentificationError(ref.posn, "Cannot reference this in a static context");
         return new VarDecl(new ClassType(new Identifier(new Token(TokenType.Identifier, activeClass.name, PREDEF_POSN.line, PREDEF_POSN.offset)), PREDEF_POSN), "this", PREDEF_POSN);
     }
 
@@ -418,17 +420,21 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
         // get ref info
         Declaration refDecl = (Declaration)ref.ref.visit(this, arg);
         if (refDecl instanceof MethodDecl)
-            throw new IdentificationError(ref.posn, String.format("Cannot access members of method %s", refDecl.name));
+            throw new IdentificationError(ref.ref.posn, String.format("Cannot access members of method %s", refDecl.name));
         String className = getClassName(refDecl);
         if (className == null)
-            throw new IdentificationError(ref.posn, String.format("Cannot access members of base type %s", typeStr(refDecl.type)));
+            throw new IdentificationError(ref.ref.posn, String.format("Cannot access members of base type %s", typeStr(refDecl.type)));
         boolean isClass = refDecl instanceof ClassDecl;
         ClassDecl classDecl = arg.getClassDecl(ref.posn, className);
 
         // find id in ref
-        MemberDecl decl = arg.getClassMember(ref.posn, classDecl.name, ref.id.spelling);
+        MemberDecl decl = arg.getClassMember(ref.id.posn, classDecl.name, ref.id.spelling);
         if (isClass && !decl.isStatic)
-            throw new IdentificationError(ref.posn, String.format("%s is not a static member of %s", decl.name, className));
+            throw new IdentificationError(ref.id.posn, String.format("Cannot non-static member %s from class %s", decl.name, className));
+        if (!isClass && decl.isStatic)
+            throw new IdentificationError(ref.id.posn, String.format("Cannot access static member %s from instance of class %s", decl.name, className));
+        if (decl.isPrivate)
+            throw new IdentificationError(ref.id.posn, String.format("%s.%s is private", className, decl.name));
         return decl;
     }
 
