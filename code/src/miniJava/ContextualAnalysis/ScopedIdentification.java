@@ -308,7 +308,11 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
                 checkTypeMatch(ctmLeftContext, expr.posn, leftType, BOOLEAN_TYPE);
                 checkTypeMatch(ctmRightContext, expr.posn, rightType, BOOLEAN_TYPE);
                 return BOOLEAN_TYPE;
-            case RelLT: case RelGT: case RelLEq: case RelGEq: case Add: case Minus: case Multiply: case Divide:
+            case RelLT: case RelGT: case RelLEq: case RelGEq:
+                checkTypeMatch(ctmLeftContext, expr.posn, leftType, INT_TYPE);
+                checkTypeMatch(ctmRightContext, expr.posn, rightType, INT_TYPE);
+                return BOOLEAN_TYPE;
+            case Add: case Minus: case Multiply: case Divide:
                 checkTypeMatch(ctmLeftContext, expr.posn, leftType, INT_TYPE);
                 checkTypeMatch(ctmRightContext, expr.posn, rightType, INT_TYPE);
                 return INT_TYPE;
