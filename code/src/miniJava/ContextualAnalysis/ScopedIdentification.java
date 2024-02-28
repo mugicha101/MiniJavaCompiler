@@ -376,7 +376,7 @@ public class ScopedIdentification implements Visitor<IdTable, Object> {
 
     @Override
     public Object visitThisRef(ThisRef ref, IdTable arg) {
-        return activeClass;
+        return new VarDecl(new ClassType(new Identifier(new Token(TokenType.Identifier, activeClass.name, PREDEF_POSN.line, PREDEF_POSN.offset)), PREDEF_POSN), "this", PREDEF_POSN);
     }
 
     @Override

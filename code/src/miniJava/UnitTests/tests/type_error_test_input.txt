@@ -8,7 +8,7 @@ class Foo {
         bar.s.test(1, 2);
         bar.s.test(true);
         int[] x = new int[false];
-        x[false] = new String();
+        x[false] = new A();
         if (bar.s.x < 2) {
             int bar = 0;
             Foo.y = 0;
@@ -19,10 +19,10 @@ class Foo {
 }
 
 class Bar {
-    String s;
+    A s;
 }
 
-class String {
+class A {
     public int x;
     public void test(int x) {
         return 0;
