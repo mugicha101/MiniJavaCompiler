@@ -38,16 +38,20 @@ public class Matcher implements Visitor<IdTable, Object> {
                 return typeStr(((ArrayType)type).eltType) + "[]";
             case VOID:
                 return "void";
+            case UNSUPPORTED:
+                return "<unsupported-type>";
             default:
                 return "<error-type>";
         }
     }
 
     boolean checkTypeMatch(TypeDenoter actual, TypeDenoter... expected) {
+        boolean isClass = actual.typeKind == TypeKind.CLASS;
+        if (actual.typeKind == TypeKind.UNSUPPORTED) return false;
         String tsAct = typeStr(actual);
         for (TypeDenoter td : expected) {
             if (
-                actual.typeKind == TypeKind.CLASS && td.typeKind == TypeKind.CLASS
+                isClass && td.typeKind == TypeKind.CLASS
                 && (
                     ((ClassType)actual).className.spelling.equals("null")
                     || ((ClassType)td).className.spelling.equals("null")
@@ -88,6 +92,7 @@ public class Matcher implements Visitor<IdTable, Object> {
         PrintStreamDecl.methodDeclList.add(new MethodDecl(new FieldDecl(false, false, new BaseType(TypeKind.VOID, PREDEF_POSN), "println", PREDEF_POSN), new ParameterDeclList(), new StatementList(), PREDEF_POSN));
         PrintStreamDecl.methodDeclList.get(0).parameterDeclList.add(new ParameterDecl(new BaseType(TypeKind.INT, PREDEF_POSN), "n", PREDEF_POSN));
         ClassDecl StringDecl = new ClassDecl("String", new FieldDeclList(), new MethodDeclList(), PREDEF_POSN);
+        StringDecl.unsupported = true;
         idTable.addClassDecl(SystemDecl);
         idTable.addScopedDecl(SystemDecl);
         idTable.addClassDecl(PrintStreamDecl);
@@ -188,8 +193,8 @@ public class Matcher implements Visitor<IdTable, Object> {
 
     @Override
     public Object visitClassType(ClassType type, IdTable arg) {
-        arg.getClassDecl(type.posn, type.className.spelling);
-        return type;
+        ClassDecl decl = arg.getClassDecl(type.posn, type.className.spelling);
+        return decl.unsupported ? UNSUPPORTED_TYPE : type;
     }
 
     @Override
@@ -398,7 +403,8 @@ public class Matcher implements Visitor<IdTable, Object> {
 
     @Override
     public Object visitNewObjectExpr(NewObjectExpr expr, IdTable arg) {
-        return expr.classtype;
+        ClassDecl decl = arg.getClassDecl(expr.posn, expr.classtype.className.spelling);
+        return decl.unsupported ? UNSUPPORTED_TYPE : expr.classtype;
     }
 
     @Override

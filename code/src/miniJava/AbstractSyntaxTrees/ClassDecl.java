@@ -8,7 +8,7 @@ package miniJava.AbstractSyntaxTrees;
 import  miniJava.SyntacticAnalyzer.SourcePosition;
 
 public class ClassDecl extends Declaration {
-
+  public boolean unsupported;
   public ClassDecl(String cn, FieldDeclList fdl, MethodDeclList mdl, SourcePosition posn) {
 	  super(cn, null, posn);
 	  fieldDeclList = fdl;
