@@ -17,6 +17,7 @@ public class Matcher implements Visitor<IdTable, Object> {
     static final TypeDenoter BOOLEAN_TYPE = new BaseType(TypeKind.BOOLEAN, null);
     static final TypeDenoter UNSUPPORTED_TYPE = new BaseType(TypeKind.UNSUPPORTED, null);
     static final TypeDenoter NULL_TYPE = new ClassType(new Identifier(new Token(TokenType.NullLiteral, "null", -1, -1)), null);
+    static final TypeDenoter VOID_TYPE = new ClassType(new Identifier(new Token(TokenType.VoidType, "void", -1, -1)), null);
     static final SourcePosition PREDEF_POSN = new SourcePosition(-1, -1);
     public ClassDecl activeClass;
     public MethodDecl activeMethod;
@@ -222,10 +223,18 @@ public class Matcher implements Visitor<IdTable, Object> {
         return null;
     }
 
+    void checkIsTyped(SourcePosition posn, Declaration decl) {
+        if (decl instanceof ClassDecl)
+            throw new IdentificationError(posn, String.format("Class %s has no type", decl.name));
+        if (decl instanceof MethodDecl)
+            throw new IdentificationError(posn, String.format("Method %s has no type", decl.name));
+    }
+
     @Override
     public Object visitAssignStmt(AssignStmt stmt, IdTable arg) {
         TypeDenoter exprType = (TypeDenoter)stmt.val.visit(this, arg);
         Declaration refDecl = (Declaration)stmt.ref.visit(this, arg);
+        checkIsTyped(refDecl.posn, refDecl);
         checkTypeMatch("assign statement", stmt.posn, exprType, refDecl.type);
         return null;
     }
@@ -272,7 +281,7 @@ public class Matcher implements Visitor<IdTable, Object> {
 
     @Override
     public Object visitReturnStmt(ReturnStmt stmt, IdTable arg) {
-        TypeDenoter retType = (TypeDenoter)stmt.returnExpr.visit(this, arg);
+        TypeDenoter retType = stmt.returnExpr == null ? VOID_TYPE : (TypeDenoter)stmt.returnExpr.visit(this, arg);
         TypeDenoter mRetType = activeMethod.type;
         checkTypeMatch(String.format("method %s.%s return statement", activeClass.name, activeMethod.name), stmt.posn, retType, mRetType);
         return retType;
@@ -350,11 +359,6 @@ public class Matcher implements Visitor<IdTable, Object> {
                 checkTypeMatch(ctmRightContext, expr.posn, rightType, UNSUPPORTED_TYPE);
                 return UNSUPPORTED_TYPE;
         }
-    }
-
-    void checkIsTyped(SourcePosition posn, Declaration decl) {
-        if (!(decl instanceof FieldDecl) && !(decl instanceof VarDecl) && !(decl instanceof ParameterDecl))
-            throw new IdentificationError(posn, String.format("%s has no type", decl.name));
     }
 
     @Override
