@@ -7,6 +7,8 @@ import miniJava.SyntacticAnalyzer.SourcePosition;
 import miniJava.SyntacticAnalyzer.Token;
 import miniJava.SyntacticAnalyzer.TokenType;
 
+import java.lang.reflect.Member;
+
 // references return Declaration
 // identifiers return Declaration
 // expressions return TypeDenoter
@@ -230,6 +232,11 @@ public class Matcher implements Visitor<IdTable, Object> {
             throw new IdentificationError(posn, String.format("Method %s has no type", decl.name));
     }
 
+    void checkIsCallable(SourcePosition posn, Declaration decl) {
+        if (!(decl instanceof MethodDecl))
+            throw new IdentificationError(posn, String.format("%s is not callable", decl.name));
+    }
+
     @Override
     public Object visitAssignStmt(AssignStmt stmt, IdTable arg) {
         TypeDenoter exprType = (TypeDenoter)stmt.val.visit(this, arg);
@@ -241,22 +248,17 @@ public class Matcher implements Visitor<IdTable, Object> {
 
     @Override
     public Object visitIxAssignStmt(IxAssignStmt stmt, IdTable arg) {
-        TypeDenoter exprType = (TypeDenoter)stmt.exp.visit(this, arg);
-        TypeDenoter ixType = (TypeDenoter)stmt.ix.visit(this, arg);
+        TypeDenoter exprType = (TypeDenoter) stmt.exp.visit(this, arg);
+        TypeDenoter ixType = (TypeDenoter) stmt.ix.visit(this, arg);
         Declaration refDecl = (Declaration) stmt.ref.visit(this, arg);
         checkTypeMatch("array index", stmt.posn, ixType, INT_TYPE);
         if (refDecl.type == null || refDecl.type.typeKind != TypeKind.ARRAY)
             errors.reportError(stmt.posn, String.format("Type mismatch in array element assignment statement: %s is not an array", typeStr(refDecl.type)));
         else {
-            TypeDenoter eltType = ((ArrayType)refDecl.type).eltType;
+            TypeDenoter eltType = ((ArrayType) refDecl.type).eltType;
             checkTypeMatch("array element assignment", stmt.posn, exprType, eltType);
         }
         return null;
-    }
-
-    void checkIsCallable(SourcePosition posn, Declaration decl) {
-        if (!(decl instanceof MethodDecl))
-            throw new IdentificationError(posn, String.format("%s is not callable", decl.name));
     }
 
     @Override
@@ -427,6 +429,11 @@ public class Matcher implements Visitor<IdTable, Object> {
 
     @Override
     public Object visitIdRef(IdRef ref, IdTable arg) {
+        Declaration decl = arg.getScopedDecl(ref.posn, ref.id.spelling);
+        if (staticActive) {
+            if (decl instanceof MemberDecl && !((MemberDecl)decl).isStatic)
+                throw new IdentificationError(ref.posn, String.format("member %s.%s is not accessible from static context", activeClass.name, ref.id.spelling));
+        }
         return ref.id.visit(this, arg);
     }
 
