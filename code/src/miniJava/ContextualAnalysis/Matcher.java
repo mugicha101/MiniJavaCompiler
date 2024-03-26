@@ -7,8 +7,6 @@ import miniJava.SyntacticAnalyzer.SourcePosition;
 import miniJava.SyntacticAnalyzer.Token;
 import miniJava.SyntacticAnalyzer.TokenType;
 
-import java.lang.reflect.Member;
-
 // references return Declaration
 // identifiers return Declaration
 // expressions return TypeDenoter
