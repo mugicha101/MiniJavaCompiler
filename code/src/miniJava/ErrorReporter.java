@@ -10,7 +10,7 @@ public class ErrorReporter {
 		final String message;
 		ErrorEntry(SourcePosition posn, String message) {
 			this.posn = posn;
-			this.message = String.format("%d:%d %s", posn.line, posn.offset, message);
+			this.message = posn == null ? message : String.format("%d:%d %s", posn.line, posn.offset, message);
 		}
 
 		@Override
@@ -32,6 +32,10 @@ public class ErrorReporter {
 		for (ErrorEntry error : errorSet) {
 			System.out.println(error.message);
 		}
+	}
+
+	public void reportError(String message) {
+		reportError(null, message);
 	}
 	
 	public void reportError(int line, int offset, String message) {
