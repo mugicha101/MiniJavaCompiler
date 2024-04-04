@@ -2,6 +2,7 @@ package miniJava;
 
 import miniJava.AbstractSyntaxTrees.AST;
 import miniJava.AbstractSyntaxTrees.Package;
+import miniJava.CodeGeneration.Codifier;
 import miniJava.ContextualAnalysis.Matcher;
 import miniJava.SyntacticAnalyzer.Parser;
 import miniJava.SyntacticAnalyzer.Scanner;
@@ -22,10 +23,14 @@ public class Compiler {
 		}
 		Scanner scanner = new Scanner(in, errors);
 		Parser parser = new Parser(scanner, errors);
-		AST ast = parser.parse();
+		Package ast = (Package)parser.parse();
 		if (ast != null) {
 			Matcher matcher = new Matcher(errors);
 			matcher.match(ast);
+			if (!errors.hasErrors()) {
+				Codifier codifier = new Codifier(errors);
+				codifier.parse(ast);
+			}
 		}
 		if (errors.hasErrors()) {
 			System.out.println("Error");

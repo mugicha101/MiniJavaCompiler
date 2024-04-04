@@ -9,7 +9,7 @@ public class ErrorReporter {
 		final SourcePosition posn;
 		final String message;
 		ErrorEntry(SourcePosition posn, String message) {
-			this.posn = posn;
+			this.posn = posn == null ? new SourcePosition(Integer.MAX_VALUE, Integer.MAX_VALUE) : posn;
 			this.message = posn == null ? message : String.format("%d:%d %s", posn.line, posn.offset, message);
 		}
 

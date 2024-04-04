@@ -9,7 +9,7 @@ public abstract class Instruction {
 	protected boolean rexR = false;
 	protected boolean rexX = false;
 	protected boolean rexB = false;
-	public int startAddress;
+	public long startAddress = -1;
 	public int listIdx;
 	private int _size = -1;
 	

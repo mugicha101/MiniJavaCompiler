@@ -4,8 +4,8 @@ import miniJava.CodeGeneration.x64.Instruction;
 
 public class Syscall extends Instruction {
 	public Syscall() {
-		// TODO: syscall is two bytes
-		opcodeBytes.write(??);
-		opcodeBytes.write(??);
+		// int $0x30
+		opcodeBytes.write(0xcd);
+		immBytes.write(0x30);
 	}
 }

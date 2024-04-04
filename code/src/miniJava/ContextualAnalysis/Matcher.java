@@ -26,53 +26,17 @@ public class Matcher implements Visitor<IdTable, Object> {
     public Matcher(ErrorReporter errors) {
         this.errors = errors;
     }
-    String typeStr(TypeDenoter type) {
-        if (type == null) return "<base-class-type>";
-        switch (type.typeKind) {
-            case INT:
-                return "int";
-            case BOOLEAN:
-                return "boolean";
-            case CLASS:
-                return ((ClassType)type).className.spelling;
-            case ARRAY:
-                return typeStr(((ArrayType)type).eltType) + "[]";
-            case VOID:
-                return "void";
-            case UNSUPPORTED:
-                return "<unsupported-type>";
-            default:
-                return "<error-type>";
-        }
-    }
 
-    boolean checkTypeMatch(TypeDenoter actual, TypeDenoter... expected) {
-        boolean isClass = actual.typeKind == TypeKind.CLASS;
-        if (actual.typeKind == TypeKind.UNSUPPORTED) return false;
-        String tsAct = typeStr(actual);
-        for (TypeDenoter td : expected) {
-            if (
-                isClass && td.typeKind == TypeKind.CLASS
-                && (
-                    ((ClassType)actual).className.spelling.equals("null")
-                    || ((ClassType)td).className.spelling.equals("null")
-                )
-            ) return true;
-            String tsExp = typeStr(td);
-            if (tsAct.equals(tsExp)) return true;
-        }
-        return false;
-    }
     void checkTypeMatch(String context, SourcePosition posn, TypeDenoter actual, TypeDenoter... expected) {
         assert(expected.length > 0);
-        if (checkTypeMatch(actual, expected)) return;
+        if (TypeChecker.typeMatches(actual, expected)) return;
         StringBuilder expStr = new StringBuilder();
-        expStr.append(typeStr(expected[0]));
+        expStr.append(TypeChecker.typeStr(expected[0]));
         for (int i = 1; i < expected.length; ++i) {
             expStr.append(" or ");
-            expStr.append(typeStr(expected[i]));
+            expStr.append(TypeChecker.typeStr(expected[i]));
         }
-        errors.reportError(posn, String.format("Type mismatch in %s: expected %s, but got %s", context, expStr, typeStr(actual)));
+        errors.reportError(posn, String.format("Type mismatch in %s: expected %s, but got %s", context, expStr, TypeChecker.typeStr(actual)));
     }
 
     // takes in decl, returns name of class
@@ -251,7 +215,7 @@ public class Matcher implements Visitor<IdTable, Object> {
         Declaration refDecl = (Declaration) stmt.ref.visit(this, arg);
         checkTypeMatch("array index", stmt.posn, ixType, INT_TYPE);
         if (refDecl.type == null || refDecl.type.typeKind != TypeKind.ARRAY)
-            errors.reportError(stmt.posn, String.format("Type mismatch in array element assignment statement: %s is not an array", typeStr(refDecl.type)));
+            errors.reportError(stmt.posn, String.format("Type mismatch in array element assignment statement: %s is not an array", TypeChecker.typeStr(refDecl.type)));
         else {
             TypeDenoter eltType = ((ArrayType) refDecl.type).eltType;
             checkTypeMatch("array element assignment", stmt.posn, exprType, eltType);
@@ -272,8 +236,8 @@ public class Matcher implements Visitor<IdTable, Object> {
             TypeDenoter argType = (TypeDenoter)callArg.visit(this, arg);
             if (!sizeMatch) continue;
             ParameterDecl pd = methodDecl.parameterDeclList.get(i);
-            if (!checkTypeMatch(argType, pd.type)) {
-                errors.reportError(stmt.posn, String.format("Type mismatch in method %s.%s: parameter %s expected %s, but got %s", activeClass.name, methodDecl.name, pd.name, typeStr(pd.type), typeStr(argType)));
+            if (!TypeChecker.typeMatches(argType, pd.type)) {
+                errors.reportError(stmt.posn, String.format("Type mismatch in method %s.%s: parameter %s expected %s, but got %s", activeClass.name, methodDecl.name, pd.name, TypeChecker.typeStr(pd.type), TypeChecker.typeStr(argType)));
             }
         }
         return null;
@@ -375,7 +339,7 @@ public class Matcher implements Visitor<IdTable, Object> {
         checkIsTyped(expr.ref.posn, refDecl);
         checkTypeMatch("array index", expr.posn, ixType, INT_TYPE);
         if (refDecl.type == null || refDecl.type.typeKind != TypeKind.ARRAY) {
-            throw new IdentificationError(expr.posn, String.format("%s is not an array", typeStr(refDecl.type)));
+            throw new IdentificationError(expr.posn, String.format("%s is not an array", TypeChecker.typeStr(refDecl.type)));
         }
         return ((ArrayType) refDecl.type).eltType;
     }
@@ -393,7 +357,7 @@ public class Matcher implements Visitor<IdTable, Object> {
             TypeDenoter argType = (TypeDenoter)callArg.visit(this, arg);
             if (!sizeMatch) continue;
             ParameterDecl pd = methodDecl.parameterDeclList.get(i);
-            if (!checkTypeMatch(argType, pd.type)) {
+            if (!TypeChecker.typeMatches(argType, pd.type)) {
                 errors.reportError(expr.posn, String.format("Type mismatch in method %s: parameter %s expected %s, but got %s", methodDecl.name, pd.name, pd.type, argType));
             }
         }
@@ -443,7 +407,7 @@ public class Matcher implements Visitor<IdTable, Object> {
             throw new IdentificationError(ref.ref.posn, String.format("Cannot access members of method %s", refDecl.name));
         String className = getClassName(refDecl);
         if (className == null)
-            throw new IdentificationError(ref.ref.posn, String.format("Cannot access members of base type %s", typeStr(refDecl.type)));
+            throw new IdentificationError(ref.ref.posn, String.format("Cannot access members of base type %s", TypeChecker.typeStr(refDecl.type)));
         boolean isClass = refDecl instanceof ClassDecl;
         ClassDecl classDecl = arg.getClassDecl(ref.posn, className);
         boolean isActiveClass = className.equals(activeClass.name);
@@ -480,7 +444,7 @@ public class Matcher implements Visitor<IdTable, Object> {
     }
 
     @Override
-    public Object visitNullLiteral(NullLiteral nullLiteral, IdTable o) {
+    public Object visitNullLiteral(NullLiteral nullLiteral, IdTable asm) {
         return NULL_TYPE;
     }
 }

@@ -8,20 +8,20 @@ package miniJava.AbstractSyntaxTrees;
 import miniJava.SyntacticAnalyzer.SourcePosition;
 
 public abstract class AST {
-
-  public AST (SourcePosition posn) {
+    public long asmOffset = -1;
+    public AST (SourcePosition posn) {
     this.posn = posn;
-  }
-  
-  public String toString() {
+    }
+
+    public String toString() {
       String fullClassName = this.getClass().getName();
       String cn = fullClassName.substring(1 + fullClassName.lastIndexOf('.'));
       if (ASTDisplay.showPosition && posn != null)
-    	  cn = cn + " " + posn.toString();
+          cn = cn + " " + posn.toString();
       return cn;
-  }
+    }
 
-  public abstract <A,R> R visit(Visitor<A,R> v, A o);
+    public abstract <A,R> R visit(Visitor<A,R> v, A o);
 
-  public SourcePosition posn;
+    public SourcePosition posn;
 }
