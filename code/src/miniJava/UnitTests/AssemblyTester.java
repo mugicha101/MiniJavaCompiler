@@ -70,6 +70,21 @@ public class AssemblyTester {
         // syscall
         check(new Syscall(), new byte[]{(byte)0xcd, (byte)0x30});
         System.out.println("syscall passed");
+
+        // modrmsib
+        // mov [rbx+0x123],r8
+        check(new Mov_rmr(new ModRMSIB(Reg64.RBX,0x123,Reg64.R8)), new byte[]{(byte)0x4c, (byte)0x89, (byte)0x83, (byte)0x23, (byte)0x01, (byte)0x00, (byte)0x00});
+
+        // mov [rcx*4+0x12345678],rbx
+        ModRMSIB arg = new ModRMSIB();
+        arg.SetRegIdx(Reg64.RCX);
+        arg.SetMult(4);
+        arg.SetDisp(0x12345678);
+        arg.SetRegR(Reg64.RBX);
+        check(new Mov_rmr(arg), new byte[]{(byte)0x48, (byte)0x89, (byte)0x1c, (byte)0x8d, (byte)0x78, (byte)0x56, (byte)0x34, (byte)0x12});
+
+        // mov rsi,[rdi+rcx*2+0x13572468]
+        check(new Mov_rrm(new ModRMSIB(Reg64.RDI, Reg64.RCX, 2, 0x13572468, Reg64.RSI)), new byte[]{(byte)0x48, (byte)0x8B, (byte)0xB4, (byte)0x4F, (byte)0x68, (byte)0x24, (byte)0x57, (byte)0x13});
     }
 
     static String byteString(byte[] bytes) {

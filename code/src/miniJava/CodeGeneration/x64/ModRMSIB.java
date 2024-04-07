@@ -97,9 +97,8 @@ public class ModRMSIB {
 		if( rm == null ) return 0;
 		return rm.size();
 	}
-	
-	//public ModRMSIB() {
-	//}
+
+	public ModRMSIB() {}
 	
 	public void SetRegRM(Reg rm) {
 		if( rm.getIdx() > 7 ) rexB = true;
@@ -146,20 +145,52 @@ public class ModRMSIB {
 	public boolean IsRegRM_R64() {
 		return rm instanceof Reg64;
 	}
+
+	private byte constructModRMByte(int mod, Reg rReg, Reg rmReg) {
+		if (mod < 0 || mod > 3)
+			throw new IllegalArgumentException("Invalid mod value: " + mod);
+		// following data from http://www.c-jump.com/CIS77/CPU/x86/X77_0060_mod_reg_r_m_byte.htm
+		// mod 0x00: reg indirect addressing mode
+		//           or SIB with no displacement (when RM == 100)
+		//           or displacement only addressing mode (when RM == 101)
+		// mod 0x01: 1 byte signed displacement 	[base+(index*s)+disp8]
+		// mod 0x10: 4 byte signed displacement 	[base+(index*s)+disp32]
+		// mod 0x11: register addressing mode   	[base+(index*s)]
+		int reg = getIdx(rReg);
+		int rm = getIdx(rmReg);
+		return (byte)((mod << 6) | (reg << 3) | rm);
+	}
+	// construct ModRM byte with SIB byte enabled
+	private byte constructModRMByte(int mod, Reg rReg) {
+		return constructModRMByte(mod, rReg, Reg64.RSP);
+	}
+	private byte constructSIBByte(Reg baseReg, Reg indexReg, int mult) {
+		// NOTE: SIB used only when ModRM.RM == 4
+		int scale = mult == 1 ? 0 : mult == 2 ? 1 : mult == 4 ? 2 : mult == 8 ? 3 : -1;
+		if (scale == -1)
+			throw new IllegalArgumentException("Invalid multiplier value: " + mult);
+		int index = getIdx(indexReg);
+		int base = getIdx(baseReg);
+		return (byte)((scale << 6) | (index << 3) | base);
+	}
+
+	private byte constructSIBByte(Reg baseReg, int mult) {
+		return constructSIBByte(baseReg, null, mult);
+	}
 	
 	// rm,r
 	private void Make(Reg rm, Reg r) {
-		int mod = 3;
-		
-		int regByte = ( mod << 6 ) | ( getIdx(r) << 3 ) | getIdx(rm);
-		_b.write( regByte ); 
+		// int mod = 3;
+		// int regByte = ( mod << 6 ) | ( getIdx(r) << 3 ) | getIdx(rm);
+		_b.write(constructModRMByte(3, r, rm));
 	}
 	
 	// [rdisp+disp],r
 	private void Make(Reg64 rdisp, int disp, Reg r) {
 		// TODO: construct the byte and write to _b
 		// Operands: [rdisp+disp],r
-		int mod;
+		_b.write(constructModRMByte(2, r, rdisp));
+		x64.writeInt(_b, disp);
 	}
 	
 	// [ridx*mult+disp],r
@@ -171,7 +202,9 @@ public class ModRMSIB {
 		
 		// TODO: construct the modrm byte and SIB byte
 		// Operands: [ridx*mult + disp], r
-		int mod, ss;
+		_b.write(constructModRMByte(0, r));
+		_b.write(constructSIBByte(Reg64.RBP, ridx, mult));
+		x64.writeInt(_b, disp);
 	}
 	
 	// [rdisp+ridx*mult+disp],r
@@ -183,28 +216,19 @@ public class ModRMSIB {
 		
 		// TODO: construct the modrm byte and SIB byte
 		// Operands: [rdisp + ridx*mult + disp], r
-		int mod, ss;
+		_b.write(constructModRMByte(2, r));
+		_b.write(constructSIBByte(rdisp, ridx, mult));
+		x64.writeInt(_b, disp);
 	}
 	
 	// [disp],r
 	private void Make( int disp, Reg r ) {
 		_b.write( ( getIdx(r) << 3 ) | 4 );
 		_b.write( ( 4 << 3 ) | 5 ); // ss doesn't matter
-		writeInt(_b,disp);
+		x64.writeInt(_b,disp);
 	}
 	
 	private int getIdx(Reg r) {
 		return x64.getIdx(r);
-	}
-	
-	// TODO: This is a duplicate declaration from x64.writeInt
-	//  You should remove this, but the reason it is here is so that
-	//  you can immediately see what it does, and so you know what
-	//  is available to you in the x64 class.
-	private void writeInt(ByteArrayOutputStream b, int n) {
-		for( int i = 0; i < 4; ++i ) {
-			b.write( n & 0xFF );
-			n >>= 8;
-		}
 	}
 }

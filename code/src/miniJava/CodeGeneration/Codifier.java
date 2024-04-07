@@ -44,6 +44,7 @@ public class Codifier implements Visitor<Object, Object> {
     private InstructionList asm;
     private MethodDecl mainMethod;
     private List<UnresolvedAddress> unresolvedAddresseList;
+    private StackAllocTable stackAllocTable;
     public Codifier(ErrorReporter errors) {
         this.errors = errors;
     }
@@ -92,6 +93,8 @@ public class Codifier implements Visitor<Object, Object> {
             // patch method 2: let the jmp calculate the offset
             //  Note the false means that it is a 32-bit immediate for jumping (an int)
             //     _asm.patch( someJump.listIdx, new Jmp(asm.size(), someJump.startAddress, false) );
+            unresolvedAddresseList = new ArrayList<>();
+            stackAllocTable = new StackAllocTable();
 
             // find public static void main
             TypeDenoter strArrType = new ArrayType(new ClassType(new Identifier(new Token(TokenType.Identifier, "String", -1, -1)), new SourcePosition(-1, -1)), new SourcePosition(-1, -1));
@@ -181,6 +184,8 @@ public class Codifier implements Visitor<Object, Object> {
         instr(new Syscall());
         return idxStart;
     }
+
+    // TODO: maybe skip storing registers on stack
 
     /*  stackframe structure (on entry)
         ENTRY TIME REGISTERS
