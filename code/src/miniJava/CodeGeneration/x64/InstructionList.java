@@ -15,6 +15,8 @@ public class InstructionList {
 	}
 	
 	public int add(Instruction ins) {
+		if (ins.startAddress != -1)
+			throw new RuntimeException("addInstruct attempted to add a previously added instruction");
 		ins.startAddress = _currentSize;
 		ins.listIdx = _currentIdx;
 		_instructions.add(ins);

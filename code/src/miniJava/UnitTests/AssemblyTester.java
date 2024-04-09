@@ -1,7 +1,9 @@
 package miniJava.UnitTests;
 
+import miniJava.CodeGeneration.ELFMaker;
 import miniJava.CodeGeneration.x64.ISA.*;
 import miniJava.CodeGeneration.x64.*;
+import miniJava.ErrorReporter;
 
 import java.math.BigInteger;
 import java.util.Arrays;
@@ -85,6 +87,21 @@ public class AssemblyTester {
 
         // mov rsi,[rdi+rcx*2+0x13572468]
         check(new Mov_rrm(new ModRMSIB(Reg64.RDI, Reg64.RCX, 2, 0x13572468, Reg64.RSI)), new byte[]{(byte)0x48, (byte)0x8B, (byte)0xB4, (byte)0x4F, (byte)0x68, (byte)0x24, (byte)0x57, (byte)0x13});
+
+        // test elf (produce program that does nothing)
+        ErrorReporter errors = new ErrorReporter();
+        InstructionList asm = new InstructionList();
+        // asm.add(new Xor(new ModRMSIB(Reg64.RAX, Reg64.RAX)));
+        // asm.add(new Ret());
+        asm.add(new Mov_rmi(new ModRMSIB(Reg64.RAX, true), 60));
+        asm.add(new Xor(new ModRMSIB(Reg64.RDI, Reg64.RDI)));
+        asm.add(new Syscall());
+        asm.add(new Ret());
+        ELFMaker elf = new ELFMaker(errors, asm.getSize(), 8);
+        elf.outputELF("test.out", asm.getBytes(), 0);
+        if (errors.hasErrors())
+            throw new RuntimeException("elf creation failed");
+        System.out.println("blank test.out elf created");
     }
 
     static String byteString(byte[] bytes) {

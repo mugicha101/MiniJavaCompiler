@@ -20,6 +20,7 @@ public class ELFMaker {
 	private ELFSection bss = new ELFSection();
 	private ELFSection shstrtab = new ELFSection();
 	private ELFSegment phdr = new ELFSegment();
+	private ELFSegment phdrLoad = new ELFSegment();
 	private ELFSegment textSeg = new ELFSegment();
 	private long phStartAddress = 0x40;
 	private long shStartAddress;
@@ -33,6 +34,7 @@ public class ELFMaker {
 		sections.add( makeNullSection() );
 		
 		segments.add(phdr);
+		// segments.add(phdrLoad);
 		segments.add(textSeg);
 		
 		// next is the .text
@@ -54,7 +56,7 @@ public class ELFMaker {
 		// make .shstrtab
 		shstrtab.sectionName = ".shstrtab";
 		shstrtab.sh_type = SHT_STRTAB; // TODO: what is the type of the shstrtab section?
-		shstrtab.sh_flags = SHF_ALLOC; // TODO: what are the flags of this section?
+		shstrtab.sh_flags = 0; // TODO: what are the flags of this section?
 		sections.add( shstrtab );
 		shstrtab.data = makeSectionStrings(sections);
 		shstrtab.sh_size = shstrtab.data.length;
@@ -71,6 +73,7 @@ public class ELFMaker {
 		for( ELFSection sh : sections ) {
 			sh.sh_addr = sdataStartAddress + vSectionSizes;
 			sh.sh_offset = sdataStartAddress + pSectionSizes;
+			System.out.printf("sh_offset: %d\n", sh.sh_offset);
 			sh.secIdx = secIdx;
 			secIdx++;
 			if( sh.data != null )
@@ -95,12 +98,20 @@ public class ELFMaker {
 		text.data = textSection;
 		
 		phdr.p_type = PT_PHDR; // TODO: what is the type of the program header segment?
-		phdr.p_flags = PF_R | PF_X; // TODO: what are the flags of the program header segment?
+		phdr.p_flags = PF_R; // TODO: what are the flags of the program header segment?
 		phdr.p_offset = phStartAddress;
 		phdr.p_vaddr = phStartAddress;
 		phdr.p_paddr = phStartAddress;
 		phdr.p_filesz = segments.size() * elf.e_phentsize;
 		phdr.p_memsz = phdr.p_filesz;
+
+		phdrLoad.p_type = PT_LOAD;
+		phdrLoad.p_flags = PF_R;
+		phdrLoad.p_offset = phdr.p_offset;
+		phdrLoad.p_vaddr = phdr.p_vaddr;
+		phdrLoad.p_paddr = phdr.p_paddr;
+		phdrLoad.p_filesz = phdr.p_filesz;
+		phdrLoad.p_memsz = phdr.p_memsz;
 		
 		textSeg.p_type = PT_LOAD; // TODO: type of the text segment?
 		textSeg.p_flags = PF_R | PF_X; // TODO: flags for the text segment?

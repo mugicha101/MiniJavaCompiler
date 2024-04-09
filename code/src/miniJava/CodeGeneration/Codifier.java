@@ -40,14 +40,14 @@ public class Codifier implements Visitor<Object, Object> {
         }
     }
     private ErrorReporter errors;
-    private long offset;
     private InstructionList asm;
     private MethodDecl mainMethod;
-    private List<UnresolvedAddress> unresolvedAddresseList;
+    private List<UnresolvedAddress> unresolvedAddressList;
     private StackAllocTable stackAllocTable;
     public Codifier(ErrorReporter errors) {
         this.errors = errors;
     }
+    private long stackBase; // base of stack (offset such that statics stored below base)
 
     public void parse(Package prog) {
         try {
@@ -93,8 +93,7 @@ public class Codifier implements Visitor<Object, Object> {
             // patch method 2: let the jmp calculate the offset
             //  Note the false means that it is a 32-bit immediate for jumping (an int)
             //     _asm.patch( someJump.listIdx, new Jmp(asm.size(), someJump.startAddress, false) );
-            unresolvedAddresseList = new ArrayList<>();
-            stackAllocTable = new StackAllocTable();
+            unresolvedAddressList = new ArrayList<>();
 
             // find public static void main
             TypeDenoter strArrType = new ArrayType(new ClassType(new Identifier(new Token(TokenType.Identifier, "String", -1, -1)), new SourcePosition(-1, -1)), new SourcePosition(-1, -1));
@@ -131,13 +130,39 @@ public class Codifier implements Visitor<Object, Object> {
             }
 
             // create asm list
-            offset = 0;
+            asm = new InstructionList();
+
+            // resolve fields (make space below stack for statics)
+            stackBase = 0;
+            instr(new Mov_rmi(new ModRMSIB(Reg64.RAX, true), 0)); // set RAX to 0 to use in push
+            for (ClassDecl classDecl : prog.classDeclList) {
+                long classMemOffset = 0;
+                for (FieldDecl fieldDecl : classDecl.fieldDeclList) {
+                    if (fieldDecl.isStatic) {
+                        fieldDecl.memOffset = stackBase;
+                        stackBase += 8;
+                        instr(new Push(Reg64.RAX));
+                    } else {
+                        fieldDecl.memOffset = classMemOffset;
+                        classMemOffset += 8;
+                    }
+                    System.out.printf("%s.%s mem offset: %d\n", classDecl.name, fieldDecl.name, fieldDecl.memOffset);
+                }
+            }
+            System.out.printf("stack base: %d\n", stackBase);
+
+            // add jump to main
+            int mainJmpIdx = instr(new Jmp(0));
+
+            // main code generation
+            stackAllocTable = new StackAllocTable();
             prog.visit(this, null);
 
             // resolve unresolved addresses
-            for (UnresolvedAddress unresolvedAddress : unresolvedAddresseList) {
+            for (UnresolvedAddress unresolvedAddress : unresolvedAddressList) {
                 unresolvedAddress.resolve();
             }
+            asm.patch(mainJmpIdx, new Jmp((int)asm.get(mainJmpIdx).startAddress, (int)mainMethod.asmOffset, false));
 
             // Output the file "a.out" if no errors
             if (!errors.hasErrors())
@@ -149,14 +174,10 @@ public class Codifier implements Visitor<Object, Object> {
 
     public void makeElf(String fname) {
         ELFMaker elf = new ELFMaker(errors, asm.getSize(), 8); // bss ignored until PA5, set to 8
-        elf.outputELF(fname, asm.getBytes(), mainMethod.asmOffset); // TODO: set the location of the main method
+        elf.outputELF(fname, asm.getBytes(), 0);
     }
 
     private int instr(Instruction instr) {
-        if (instr.startAddress != -1)
-            throw new RuntimeException("addInstruct attempted to add a previously added instruction");
-        instr.startAddress = offset;
-        offset += instr.size();
         return asm.add(instr);
     }
 
@@ -176,11 +197,13 @@ public class Codifier implements Visitor<Object, Object> {
         return idxStart;
     }
 
+    // rdx: # bytes to write
+    // rsi: pointer to char buffer
     private int addPrintln() {
         // TODO: how can we generate the assembly to println?
         int idxStart = asm.getSize();
-        instr(new Xor(new ModRMSIB(Reg64.RAX, Reg64.RAX)));
-        instr(new Add(new ModRMSIB(Reg64.RAX, true), 1));
+        instr(new Mov_rmi(new ModRMSIB(Reg64.RAX, true), 1)); // set syscall to SYS_write
+        instr(new Mov_rmi(new ModRMSIB(Reg64.RDI, true), 1)); // set output to fd standard out
         instr(new Syscall());
         return idxStart;
     }
@@ -188,15 +211,9 @@ public class Codifier implements Visitor<Object, Object> {
     // TODO: maybe skip storing registers on stack
 
     /*  stackframe structure (on entry)
+        METHOD ARGS (first arg = lowest addr)
+        +0x38+
         ENTRY TIME REGISTERS
-        +0x70 R15
-        +0x68 R14
-        +0x60 R13
-        +0x58 R12
-        +0x50 R11
-        +0x48 R10
-        +0x40 R9
-        +0x38 R8
         +0x30 RDI
         +0x28 RSI
         +0x20 RBX
@@ -209,47 +226,11 @@ public class Codifier implements Visitor<Object, Object> {
         -0x16 ---
      */
 
-    private void addFuncCall(Call call) {
-        // store entry time register values onto stack
-        instr(new Push(Reg64.R15));
-        instr(new Push(Reg64.R14));
-        instr(new Push(Reg64.R13));
-        instr(new Push(Reg64.R12));
-        instr(new Push(Reg64.R11));
-        instr(new Push(Reg64.R10));
-        instr(new Push(Reg64.R9));
-        instr(new Push(Reg64.R8));
-        instr(new Push(Reg64.RDI));
-        instr(new Push(Reg64.RSI));
-        instr(new Push(Reg64.RBX));
-        instr(new Push(Reg64.RDX));
-        instr(new Push(Reg64.RCX));
-        instr(new Push(Reg64.RAX));
-
-        // call
-        instr(call);
-
-        // restore registers
-        instr(new Pop(Reg64.RAX));
-        instr(new Pop(Reg64.RCX));
-        instr(new Pop(Reg64.RDX));
-        instr(new Pop(Reg64.RBX));
-        instr(new Pop(Reg64.RSI));
-        instr(new Pop(Reg64.RDI));
-        instr(new Pop(Reg64.R8));
-        instr(new Pop(Reg64.R8));
-        instr(new Pop(Reg64.R9));
-        instr(new Pop(Reg64.R10));
-        instr(new Pop(Reg64.R11));
-        instr(new Pop(Reg64.R12));
-        instr(new Pop(Reg64.R13));
-        instr(new Pop(Reg64.R14));
-        instr(new Pop(Reg64.R15));
-    }
+    final long ARG_OFFSET = -0x38; // RBP + ARG_OFFSET = address of first argument
 
     @Override
     public Object visitPackage(Package prog, Object arg) {
-        prog.asmOffset = offset;
+        prog.asmOffset = asm.getSize();
         for (ClassDecl classDecl : prog.classDeclList) {
             classDecl.visit(this, arg);
         }
@@ -258,10 +239,7 @@ public class Codifier implements Visitor<Object, Object> {
 
     @Override
     public Object visitClassDecl(ClassDecl cd, Object arg) {
-        cd.asmOffset = offset;
-        for (FieldDecl fieldDecl : cd.fieldDeclList) {
-            fieldDecl.visit(this, arg);
-        }
+        cd.asmOffset = asm.getSize();
         for (MethodDecl methodDecl : cd.methodDeclList) {
             methodDecl.visit(this, arg);
         }
@@ -270,209 +248,236 @@ public class Codifier implements Visitor<Object, Object> {
 
     @Override
     public Object visitFieldDecl(FieldDecl fd, Object arg) {
-        fd.asmOffset = offset;
-        fd.type.visit(this, arg);
-        return null;
+        throw new CodeGenerationError("visitFieldDecl should not be called");
     }
 
     @Override
     public Object visitMethodDecl(MethodDecl md, Object arg) {
-        md.asmOffset = offset;
+        md.asmOffset = asm.getSize();
 
         // PROLOGUE
+        // store entry time register values onto stack
+        instr(new Push(Reg64.RDI));
+        instr(new Push(Reg64.RSI));
+        instr(new Push(Reg64.RBX));
+        instr(new Push(Reg64.RDX));
+        instr(new Push(Reg64.RCX));
+        instr(new Push(Reg64.RAX));
+
         // update rbp and rsp
         instr(new Push(Reg64.RBP)); // push rbp
         instr(new Mov_rmr(new ModRMSIB(Reg64.RBP, Reg64.RSP))); // mov rbp,rsp
 
         // BODY
-        md.type.visit(this, arg);
-        for (ParameterDecl pd : md.parameterDeclList) {
-            pd.visit(this, arg);
-        }
+        // push parameters onto stack
+
         for (Statement stmt : md.statementList) {
             stmt.visit(this, arg);
         }
 
         // EPILOGUE
         // update rbp and rsp
-        instr(new Mov_rmr(new ModRMSIB(Reg64.RBP, Reg64.RSP))); // mov rbp,rsp (pop all local variables)
+        instr(new Mov_rmr(new ModRMSIB(Reg64.RSP, Reg64.RBP))); // mov rsp,rbp (pop all local variables)
         instr(new Pop(Reg64.RBP)); // pop rbp
+
+        // restore entry time registers
+        instr(new Pop(Reg64.RAX));
+        instr(new Pop(Reg64.RCX));
+        instr(new Pop(Reg64.RDX));
+        instr(new Pop(Reg64.RBX));
+        instr(new Pop(Reg64.RSI));
+        instr(new Pop(Reg64.RDI));
+
+        // return
         instr(new Ret()); // TODO: handle return values
         return null;
     }
 
+    private int typeSize(TypeDenoter type) {
+        if (type instanceof ClassType) {
+            return 8;
+        }
+        switch (type.typeKind) {
+            case INT: return 4;
+            case BOOLEAN: return 1;
+            case ARRAY: return 8;
+            default: throw new CodeGenerationError(String.format("typeSize called for %s type", type.typeKind));
+        }
+    }
+
+    private void stackAlloc(TypeDenoter type, String name) {
+        stackAllocTable.pushStackVariable(name, typeSize(type));
+        instr(new Xor(new ModRMSIB(Reg64.RAX, Reg64.RAX)));
+        instr(new Push(Reg64.RAX));
+    }
+
     @Override
     public Object visitParameterDecl(ParameterDecl pd, Object arg) {
-        pd.asmOffset = offset;
-        pd.type.visit(this, arg);
-        return null;
+        throw new CodeGenerationError("visitParameterDecl should not be visited");
     }
 
     @Override
     public Object visitVarDecl(VarDecl decl, Object arg) {
-        decl.asmOffset = offset;
-        return null;
+        throw new CodeGenerationError("visitVarDecl should not be visited");
     }
 
     @Override
     public Object visitBaseType(BaseType type, Object arg) {
-        type.asmOffset = offset;
-        return null;
+        throw new CodeGenerationError("visitBaseType should not be visited");
     }
 
     @Override
     public Object visitClassType(ClassType type, Object arg) {
-        type.asmOffset = offset;
-        return null;
+        throw new CodeGenerationError("visitClassType should not be visited");
     }
 
     @Override
     public Object visitArrayType(ArrayType type, Object arg) {
-        type.asmOffset = offset;
-        return null;
+        throw new CodeGenerationError("visitArrayType should not be visited");
     }
 
     @Override
     public Object visitBlockStmt(BlockStmt stmt, Object arg) {
-        stmt.asmOffset = offset;
+        stmt.asmOffset = asm.getSize();
         return null;
     }
 
     @Override
     public Object visitVardeclStmt(VarDeclStmt stmt, Object arg) {
-        stmt.asmOffset = offset;
+        stmt.asmOffset = asm.getSize();
+        stmt.varDecl.visit(this, arg);
         return null;
     }
 
     @Override
     public Object visitAssignStmt(AssignStmt stmt, Object arg) {
-        stmt.asmOffset = offset;
+        stmt.asmOffset = asm.getSize();
         return null;
     }
 
     @Override
     public Object visitIxAssignStmt(IxAssignStmt stmt, Object arg) {
-        stmt.asmOffset = offset;
+        stmt.asmOffset = asm.getSize();
         return null;
     }
 
     @Override
     public Object visitCallStmt(CallStmt stmt, Object arg) {
-        stmt.asmOffset = offset;
+        stmt.asmOffset = asm.getSize();
         return null;
     }
 
     @Override
     public Object visitReturnStmt(ReturnStmt stmt, Object arg) {
-        stmt.asmOffset = offset;
+        stmt.asmOffset = asm.getSize();
         return null;
     }
 
     @Override
     public Object visitIfStmt(IfStmt stmt, Object arg) {
-        stmt.asmOffset = offset;
+        stmt.asmOffset = asm.getSize();
         return null;
     }
 
     @Override
     public Object visitWhileStmt(WhileStmt stmt, Object arg) {
-        stmt.asmOffset = offset;
+        stmt.asmOffset = asm.getSize();
         return null;
     }
 
     @Override
     public Object visitUnaryExpr(UnaryExpr expr, Object arg) {
-        expr.asmOffset = offset;
+        expr.asmOffset = asm.getSize();
         return null;
     }
 
     @Override
     public Object visitBinaryExpr(BinaryExpr expr, Object arg) {
-        expr.asmOffset = offset;
+        expr.asmOffset = asm.getSize();
         return null;
     }
 
     @Override
     public Object visitRefExpr(RefExpr expr, Object arg) {
-        expr.asmOffset = offset;
+        expr.asmOffset = asm.getSize();
         return null;
     }
 
     @Override
     public Object visitIxExpr(IxExpr expr, Object arg) {
-        expr.asmOffset = offset;
+        expr.asmOffset = asm.getSize();
         return null;
     }
 
     @Override
     public Object visitCallExpr(CallExpr expr, Object arg) {
-        expr.asmOffset = offset;
+        expr.asmOffset = asm.getSize();
         return null;
     }
 
     @Override
     public Object visitLiteralExpr(LiteralExpr expr, Object arg) {
-        expr.asmOffset = offset;
+        expr.asmOffset = asm.getSize();
         return null;
     }
 
     @Override
     public Object visitNewObjectExpr(NewObjectExpr expr, Object arg) {
-        expr.asmOffset = offset;
+        expr.asmOffset = asm.getSize();
         return null;
     }
 
     @Override
     public Object visitNewArrayExpr(NewArrayExpr expr, Object arg) {
-        expr.asmOffset = offset;
+        expr.asmOffset = asm.getSize();
         return null;
     }
 
     @Override
     public Object visitThisRef(ThisRef ref, Object arg) {
-        ref.asmOffset = offset;
+        ref.asmOffset = asm.getSize();
         return null;
     }
 
     @Override
     public Object visitIdRef(IdRef ref, Object arg) {
-        ref.asmOffset = offset;
+        ref.asmOffset = asm.getSize();
         return null;
     }
 
     @Override
     public Object visitQRef(QualRef ref, Object arg) {
-        ref.asmOffset = offset;
+        ref.asmOffset = asm.getSize();
         return null;
     }
 
     @Override
     public Object visitIdentifier(Identifier id, Object arg) {
-        id.asmOffset = offset;
+        id.asmOffset = asm.getSize();
         return null;
     }
 
     @Override
     public Object visitOperator(Operator op, Object arg) {
-        op.asmOffset = offset;
+        op.asmOffset = asm.getSize();
         return null;
     }
 
     @Override
     public Object visitIntLiteral(IntLiteral num, Object arg) {
-        num.asmOffset = offset;
+        num.asmOffset = asm.getSize();
         return null;
     }
 
     @Override
     public Object visitBooleanLiteral(BooleanLiteral bool, Object arg) {
-        bool.asmOffset = offset;
+        bool.asmOffset = asm.getSize();
         return null;
     }
 
     @Override
     public Object visitNullLiteral(NullLiteral nullLiteral, Object arg) {
-        nullLiteral.asmOffset = offset;
+        nullLiteral.asmOffset = asm.getSize();
         return null;
     }
 }
