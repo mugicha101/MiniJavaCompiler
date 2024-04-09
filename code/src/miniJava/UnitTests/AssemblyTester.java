@@ -70,7 +70,7 @@ public class AssemblyTester {
         System.out.println("mov_ri64 passed");
 
         // syscall
-        check(new Syscall(), new byte[]{(byte)0xcd, (byte)0x30});
+        check(new Syscall(), new byte[]{(byte)0x0f, (byte)0x05});
         System.out.println("syscall passed");
 
         // modrmsib
