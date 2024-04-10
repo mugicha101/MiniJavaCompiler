@@ -3,3 +3,4 @@ Added visitNullLiteral in Visitor
 Implemented visitNullLiteral in ASTDisplay
 Add decl field to Identifier
 Add unsupported field to ClassDecl
+Add decl field to Reference
