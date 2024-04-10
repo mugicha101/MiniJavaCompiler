@@ -73,7 +73,6 @@ public class ELFMaker {
 		for( ELFSection sh : sections ) {
 			sh.sh_addr = sdataStartAddress + vSectionSizes;
 			sh.sh_offset = sdataStartAddress + pSectionSizes;
-			System.out.printf("sh_offset: %d\n", sh.sh_offset);
 			sh.secIdx = secIdx;
 			secIdx++;
 			if( sh.data != null )
