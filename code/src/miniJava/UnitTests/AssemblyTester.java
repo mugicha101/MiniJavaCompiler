@@ -88,6 +88,10 @@ public class AssemblyTester {
         // mov rsi,[rdi+rcx*2+0x13572468]
         check(new Mov_rrm(new ModRMSIB(Reg64.RDI, Reg64.RCX, 2, 0x13572468, Reg64.RSI)), new byte[]{(byte)0x48, (byte)0x8B, (byte)0xB4, (byte)0x4F, (byte)0x68, (byte)0x24, (byte)0x57, (byte)0x13});
 
+        // lea rax,[rsp+4]
+        check(new Lea(new ModRMSIB(Reg64.RSP, 4, Reg64.RAX)), new byte[]{(byte)0x48, (byte)0x8d, (byte)0x84, (byte)0x24, (byte)0x04, (byte)0x00, (byte)0x00, (byte)0x00});
+        System.out.println("modrmsib passed");
+
         // cld
         check(new ClearDirFlag(), new byte[]{(byte)0xfc});
         System.out.println("cld passed");

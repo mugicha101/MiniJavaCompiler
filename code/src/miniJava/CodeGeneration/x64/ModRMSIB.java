@@ -173,10 +173,6 @@ public class ModRMSIB {
 		int base = getIdx(baseReg);
 		return (byte)((scale << 6) | (index << 3) | base);
 	}
-
-	private byte constructSIBByte(Reg baseReg, int mult) {
-		return constructSIBByte(baseReg, null, mult);
-	}
 	
 	// rm,r
 	private void Make(Reg rm, Reg r) {
@@ -190,6 +186,11 @@ public class ModRMSIB {
 		// TODO: construct the byte and write to _b
 		// Operands: [rdisp+disp],r
 		_b.write(constructModRMByte(2, r, rdisp));
+		if (rdisp == Reg64.RSP) {
+			// 0010 1100
+			// 0010 0100
+			_b.write(constructSIBByte(rdisp, rdisp, 1));
+		}
 		x64.writeInt(_b, disp);
 	}
 	
