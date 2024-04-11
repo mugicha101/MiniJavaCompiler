@@ -4,3 +4,7 @@ Implemented visitNullLiteral in ASTDisplay
 Add decl field to Identifier
 Add unsupported field to ClassDecl
 Add decl field to Reference
+add memOffset field to Declaration
+add memSize field to ClassDecl
+add parent field to MemberDecl
+add static printlnMethod field to MethodDecl

@@ -1,6 +1,16 @@
-class Foo {
-    static int test;
-    public static void main(String[] args) {
-        int x = 0;
-    }
+/**
+ * COMP 520
+ * int arithmetic
+ */
+class MainClass {
+   public static void main (String [] args) {
+	   int var0 = 48;
+       int var1 = 1;
+       int var2 = 2 * var1;
+       int var3 = 9 / 2;
+       System.out.println (var0 + var2);
+       System.out.println (var0 + var3);
+   }
 }
+
+

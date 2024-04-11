@@ -8,6 +8,7 @@ import java.util.Stack;
 
 public class StackAllocTable {
     // local variables
+    private long rbp;
     private long stackOffset;
     private final Map<String, Long> stackVarMap = new HashMap<>(); // maps local variable to stack position
     private final Stack<String> stackVars = new Stack<>();
@@ -16,9 +17,14 @@ public class StackAllocTable {
     // call when entering method
     public void reset() {
         stackOffset = 0;
+        rbp = 0;
         stackVarMap.clear();
         stackVars.clear();
         stackSizes.clear();
+    }
+    // sets rbp to stack top
+    public void updateRBP() {
+        rbp = stackOffset;
     }
     // adds a stack variable (ensure no double inserts)
     public void pushStackVariable(String name, int byteSize) {
@@ -42,6 +48,6 @@ public class StackAllocTable {
     public long findStackVariableRBPOffset(String name) {
         if (!stackVarMap.containsKey(name))
             throw new CodeGenerationError(String.format("No variable with name %s exists on the stack", name));
-        return stackVarMap.get(name) - stackOffset;
+        return stackVarMap.get(name) - rbp;
     }
 }

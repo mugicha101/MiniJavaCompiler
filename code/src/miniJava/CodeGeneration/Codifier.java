@@ -10,45 +10,61 @@ import miniJava.SyntacticAnalyzer.SourcePosition;
 import miniJava.SyntacticAnalyzer.Token;
 import miniJava.SyntacticAnalyzer.TokenType;
 
-import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Stack;
 
 public class Codifier implements Visitor<Object, Object> {
+    private final boolean CALL_REG_DUMP = false; // true if entry time registers pushed on call
     private static class UnresolvedAddress {
-        private final AST target;
+        enum Type {CALL, JMP, COND_JMP};
+        private final InstructionList asm;
+        private final Type type;
         private final Instruction instr;
-        private final long relativeOffset;
-        private final int byteOffset;
-        public UnresolvedAddress(AST target, Instruction instr, int byteOffset, long relativeOffset) {
+        private final MethodDecl target;
+        public UnresolvedAddress(InstructionList asm, int asmIdx, MethodDecl target) {
+            this.asm = asm;
+            this.instr = asm.get(asmIdx);
+            if (instr instanceof Call)
+                type = Type.CALL;
+            else if (instr instanceof Jmp)
+                type = Type.JMP;
+            else if (instr instanceof CondJmp)
+                type = Type.COND_JMP;
+            else throw new IllegalArgumentException("unsupported instruction type for unresolved address");
             this.target = target;
-            this.instr = instr;
-            this.byteOffset = byteOffset;
-            this.relativeOffset = relativeOffset;
-        }
-        public UnresolvedAddress(AST target, Instruction instr, int byteOffset) {
-            this(target, instr, byteOffset, 0);
         }
         public void resolve() {
-            byte[] instrBytes = instr.getBytes();
-            ByteArrayOutputStream addrBytes = new ByteArrayOutputStream();
-            x64.writeLong(addrBytes, target.asmOffset + relativeOffset);
-            int i = 0;
-            for (byte b : addrBytes.toByteArray()) {
-                instrBytes[byteOffset + i++] = b;
+            Instruction newInstr;
+            switch (type) {
+                case JMP:
+                    newInstr = new Jmp((int)instr.startAddress, (int)target.asmOffset, true);
+                    break;
+                case COND_JMP:
+                    newInstr = new CondJmp(((CondJmp)instr).cond, (int)instr.startAddress, (int)target.asmOffset, true);
+                    break;
+                case CALL:
+                    newInstr = new Call((int)instr.startAddress, (int)target.asmOffset);
+                    break;
+                default:
+                    throw new IllegalArgumentException("unknown unresolved instruction type");
             }
+            asm.patch(instr.listIdx, newInstr);
         }
     }
     private ErrorReporter errors;
     private InstructionList asm;
     private MethodDecl mainMethod;
     private List<UnresolvedAddress> unresolvedAddressList;
-    private StackAllocTable stackAllocTable;
+    private Stack<Integer> blockScopeStackSizes;
+    private int rbpOffset;
     public Codifier(ErrorReporter errors) {
         this.errors = errors;
     }
-    private long stackBase; // base of stack (offset such that statics stored below base)
-
+    private int thisMemOffset;
+    private void addUnresolved(int idx, MethodDecl target) {
+        unresolvedAddressList.add(new UnresolvedAddress(asm, idx, target));
+    }
     public void parse(Package prog) {
         try {
             // If you haven't refactored the name "ModRMSIB" to something like "R",
@@ -129,40 +145,49 @@ public class Codifier implements Visitor<Object, Object> {
                 throw new CodeGenerationError(sb.toString());
             }
 
-            // create asm list
+            // create bookkeeping objects
             asm = new InstructionList();
+            blockScopeStackSizes = new Stack<>();
 
-            // resolve fields (make space below stack for statics)
-            stackBase = 0;
-            instr(new Mov_rmi(new ModRMSIB(Reg64.RAX, true), 0)); // set RAX to 0 to use in push
+            // store stack base at r15
+            instr(new Mov_rmr(new ModRMSIB(Reg64.R15, Reg64.RSP)));
+
+            // resolve fields (add statics below main stackframe)
+            long stackBase = 0;
+            instr(new Xor(new ModRMSIB(Reg64.RAX, Reg64.RAX)));
             for (ClassDecl classDecl : prog.classDeclList) {
+                classDecl.memOffset = stackBase;
                 long classMemOffset = 0;
                 for (FieldDecl fieldDecl : classDecl.fieldDeclList) {
                     if (fieldDecl.isStatic) {
                         fieldDecl.memOffset = stackBase;
-                        stackBase += 8;
+                        stackBase -= 8;
                         instr(new Push(Reg64.RAX));
                     } else {
                         fieldDecl.memOffset = classMemOffset;
                         classMemOffset += 8;
                     }
-                    System.out.printf("%s.%s mem offset: %d\n", classDecl.name, fieldDecl.name, fieldDecl.memOffset);
+                    System.out.printf("field %s.%s mem offset: %d\n", classDecl.name, fieldDecl.name, fieldDecl.memOffset);
                 }
+                classDecl.memSize = classMemOffset;
             }
             System.out.printf("stack base: %d\n", stackBase);
 
-            // add jump to main
-            int mainJmpIdx = instr(new Jmp(0));
+            // add call to main (copy arg passed into main to top of stack)
+            instr(new Mov_rrm(new ModRMSIB(Reg64.R15, -8, Reg64.RAX)));
+            instr(new Push(Reg64.RAX));
+            addUnresolved(instr(new Call(0,0)), mainMethod);
+
+            // exit
+            addExit();
 
             // main code generation
-            stackAllocTable = new StackAllocTable();
             prog.visit(this, null);
 
-            // resolve unresolved addresses
+            // resolve unresolved jumps and calls
             for (UnresolvedAddress unresolvedAddress : unresolvedAddressList) {
                 unresolvedAddress.resolve();
             }
-            asm.patch(mainJmpIdx, new Jmp((int)asm.get(mainJmpIdx).startAddress, (int)mainMethod.asmOffset, false));
 
             // Output the file "a.out" if no errors
             if (!errors.hasErrors())
@@ -200,10 +225,17 @@ public class Codifier implements Visitor<Object, Object> {
     // rdx: # bytes to write
     // rsi: pointer to char buffer
     private int addPrintln() {
-        // TODO: how can we generate the assembly to println?
         int idxStart = asm.getSize();
         instr(new Mov_rmi(new ModRMSIB(Reg64.RAX, true), 1)); // set syscall to SYS_write
         instr(new Mov_rmi(new ModRMSIB(Reg64.RDI, true), 1)); // set output to fd standard out
+        instr(new Syscall());
+        return idxStart;
+    }
+
+    private int addExit() {
+        int idxStart = asm.getSize();
+        instr(new Mov_rmi(new ModRMSIB(Reg64.RAX, true), 60));
+        instr(new Xor(new ModRMSIB(Reg64.RDI, Reg64.RDI)));
         instr(new Syscall());
         return idxStart;
     }
@@ -212,21 +244,21 @@ public class Codifier implements Visitor<Object, Object> {
 
     /*  stackframe structure (on entry)
         METHOD ARGS (first arg = lowest addr)
-        +0x38+
-        ENTRY TIME REGISTERS
-        +0x30 RDI
-        +0x28 RSI
-        +0x20 RBX
-        +0x18 RDX
-        +0x10 RCX
-        +0x08 RAX
+        +0x40+ (if CALL_REG_DUMP false, +0x10+)
+        ENTRY TIME REGISTERS (if CALL_REG_DUMP)
+        +0x38 RDI
+        +0x30 RSI
+        +0x28 RBX
+        +0x20 RDX
+        +0x18 RCX
+        +0x10 RAX
+        +0x08 RIP (Return Addr)
         +0x00 RBP (Last Frame RBP) <- RBP
-        -0x08 RIP (Return Addr) <- RSP
         LOCAL VARIABLES
-        -0x16 ---
+        -0x16 --- <- RSP
      */
 
-    final long ARG_OFFSET = -0x38; // RBP + ARG_OFFSET = address of first argument
+    final int ARG_OFFSET = CALL_REG_DUMP ? 0x40 : 0x10; // RBP - ARG_OFFSET = address of first argument
 
     @Override
     public Object visitPackage(Package prog, Object arg) {
@@ -254,25 +286,50 @@ public class Codifier implements Visitor<Object, Object> {
     @Override
     public Object visitMethodDecl(MethodDecl md, Object arg) {
         md.asmOffset = asm.getSize();
+        System.out.printf("method %s.%s address: %x\n", md.parent.name, md.name, md.asmOffset+0x1b0);
 
         // PROLOGUE
         // store entry time register values onto stack
-        instr(new Push(Reg64.RDI));
-        instr(new Push(Reg64.RSI));
-        instr(new Push(Reg64.RBX));
-        instr(new Push(Reg64.RDX));
-        instr(new Push(Reg64.RCX));
-        instr(new Push(Reg64.RAX));
+        if (CALL_REG_DUMP) {
+            instr(new Push(Reg64.RDI));
+            instr(new Push(Reg64.RSI));
+            instr(new Push(Reg64.RBX));
+            instr(new Push(Reg64.RDX));
+            instr(new Push(Reg64.RCX));
+            instr(new Push(Reg64.RAX));
+        }
 
         // update rbp and rsp
         instr(new Push(Reg64.RBP)); // push rbp
         instr(new Mov_rmr(new ModRMSIB(Reg64.RBP, Reg64.RSP))); // mov rbp,rsp
 
-        // BODY
-        // push parameters onto stack
+        // map parameters
+        int paramOffset = ARG_OFFSET;
+        for (ParameterDecl param : md.parameterDeclList) {
+            param.memOffset = paramOffset;
+            System.out.printf("param %s: %d\n", param.name, paramOffset);
+            paramOffset += 8;
+        }
+        if (!md.isStatic) {
+            System.out.printf("param this: %d\n", paramOffset);
+            thisMemOffset = paramOffset;
+        }
+        rbpOffset = 0;
+        blockScopeStackSizes.clear();
+        blockScopeStackSizes.push(0);
 
-        for (Statement stmt : md.statementList) {
-            stmt.visit(this, arg);
+        // BODY
+        if (md == MethodDecl.printlnMethod) {
+            // special println segment
+            int memOffset = (int)md.parameterDeclList.get(0).memOffset;
+            System.out.println(memOffset);
+            instr(new Lea(new ModRMSIB(Reg64.RBP, memOffset, Reg64.RSI)));
+            instr(new Mov_rmi(new ModRMSIB(Reg64.RDX, true), 1));
+            addPrintln();
+        } else {
+            for (Statement stmt : md.statementList) {
+                stmt.visit(this, arg);
+            }
         }
 
         // EPILOGUE
@@ -281,12 +338,14 @@ public class Codifier implements Visitor<Object, Object> {
         instr(new Pop(Reg64.RBP)); // pop rbp
 
         // restore entry time registers
-        instr(new Pop(Reg64.RAX));
-        instr(new Pop(Reg64.RCX));
-        instr(new Pop(Reg64.RDX));
-        instr(new Pop(Reg64.RBX));
-        instr(new Pop(Reg64.RSI));
-        instr(new Pop(Reg64.RDI));
+        if (CALL_REG_DUMP) {
+            instr(new Pop(Reg64.RAX));
+            instr(new Pop(Reg64.RCX));
+            instr(new Pop(Reg64.RDX));
+            instr(new Pop(Reg64.RBX));
+            instr(new Pop(Reg64.RSI));
+            instr(new Pop(Reg64.RDI));
+        }
 
         // return
         instr(new Ret()); // TODO: handle return values
@@ -305,179 +364,347 @@ public class Codifier implements Visitor<Object, Object> {
         }
     }
 
-    private void stackAlloc(TypeDenoter type, String name) {
-        stackAllocTable.pushStackVariable(name, typeSize(type));
-        instr(new Xor(new ModRMSIB(Reg64.RAX, Reg64.RAX)));
-        instr(new Push(Reg64.RAX));
-    }
-
     @Override
     public Object visitParameterDecl(ParameterDecl pd, Object arg) {
-        throw new CodeGenerationError("visitParameterDecl should not be visited");
+        throw new CodeGenerationError("visitParameterDecl should not be called");
     }
 
     @Override
     public Object visitVarDecl(VarDecl decl, Object arg) {
-        throw new CodeGenerationError("visitVarDecl should not be visited");
+        throw new CodeGenerationError("visitVarDecl should not be called");
     }
 
     @Override
     public Object visitBaseType(BaseType type, Object arg) {
-        throw new CodeGenerationError("visitBaseType should not be visited");
+        throw new CodeGenerationError("visitBaseType should not be called");
     }
 
     @Override
     public Object visitClassType(ClassType type, Object arg) {
-        throw new CodeGenerationError("visitClassType should not be visited");
+        throw new CodeGenerationError("visitClassType should not be called");
     }
 
     @Override
     public Object visitArrayType(ArrayType type, Object arg) {
-        throw new CodeGenerationError("visitArrayType should not be visited");
+        throw new CodeGenerationError("visitArrayType should not be called");
     }
 
     @Override
     public Object visitBlockStmt(BlockStmt stmt, Object arg) {
         stmt.asmOffset = asm.getSize();
+        blockScopeStackSizes.push(0);
+        for (Statement nestedStmt : stmt.sl) {
+            nestedStmt.visit(this, arg);
+        }
+        int popSize = blockScopeStackSizes.pop();
+        rbpOffset += popSize;
+        instr(new Lea(new ModRMSIB(Reg64.RSP, popSize, Reg64.RSP)));
         return null;
+    }
+
+    // push var onto stack in bookkeeping
+    private void stackAlloc(VarDecl var) {
+        rbpOffset -= 8;
+        var.memOffset = rbpOffset;
+        blockScopeStackSizes.push(blockScopeStackSizes.pop() + 8);
     }
 
     @Override
     public Object visitVardeclStmt(VarDeclStmt stmt, Object arg) {
         stmt.asmOffset = asm.getSize();
-        stmt.varDecl.visit(this, arg);
+        stmt.initExp.visit(this, arg);
+        stackAlloc(stmt.varDecl);
         return null;
     }
 
     @Override
     public Object visitAssignStmt(AssignStmt stmt, Object arg) {
         stmt.asmOffset = asm.getSize();
+        stmt.ref.visit(this, arg);
+        stmt.val.visit(this, arg);
+        instr(new Pop(Reg64.RAX));
+        instr(new Pop(Reg64.RDI));
+        instr(new Mov_rmr(new ModRMSIB(Reg64.RDI, 0, Reg64.RAX)));
         return null;
     }
 
     @Override
     public Object visitIxAssignStmt(IxAssignStmt stmt, Object arg) {
         stmt.asmOffset = asm.getSize();
+        // TODO
         return null;
+    }
+
+    // assume current object reference at top of stack
+    private void handleCall(ExprList argList, Reference methodRef) {
+        methodRef.visit(this, null);
+        int argBytes = (((MethodDecl)methodRef.decl).isStatic ? 0 : 8) + argList.size() * 8;
+        for (int i = argList.size()-1; i >= 0; i--) {
+            argList.get(i).visit(this, null);
+        }
+        addUnresolved(instr(new Call(0, 0)), (MethodDecl)methodRef.decl);
+        instr(new Add(new ModRMSIB(Reg64.RSP, true), argBytes));
     }
 
     @Override
     public Object visitCallStmt(CallStmt stmt, Object arg) {
         stmt.asmOffset = asm.getSize();
+        handleCall(stmt.argList, stmt.methodRef);
         return null;
     }
 
     @Override
     public Object visitReturnStmt(ReturnStmt stmt, Object arg) {
         stmt.asmOffset = asm.getSize();
+        // TODO
         return null;
     }
 
     @Override
     public Object visitIfStmt(IfStmt stmt, Object arg) {
         stmt.asmOffset = asm.getSize();
+        // TODO
         return null;
     }
 
     @Override
     public Object visitWhileStmt(WhileStmt stmt, Object arg) {
         stmt.asmOffset = asm.getSize();
+        // TODO
         return null;
     }
 
     @Override
     public Object visitUnaryExpr(UnaryExpr expr, Object arg) {
         expr.asmOffset = asm.getSize();
+        // TODO
         return null;
+    }
+
+    // loads flag at index flagIdx into specified reg
+    // inverts result if flip true
+    // clobbers RAX unless RAX is reg
+    /* flag indices:
+        0 - CF carry
+        2 - PF parity
+        4 - AF aux carry
+        6 - ZF zero
+        7 - SF sign
+        8 - TF trap
+        9 - IF interrupt enable
+        10 - DF direction
+        11 - OF overflow
+     */
+    private int getFlag(Reg64 reg, int flagIdx, boolean flip) {
+        if (flagIdx < 0 || flagIdx > 11) throw new IllegalArgumentException(String.format("getFlag recieved invalid flagIdx %d", flagIdx));
+        int startIdx = asm.getSize();
+        instr(new LoadFlags());
+        if (reg != Reg64.RAX) instr(new Mov_rmr(new ModRMSIB(reg, Reg64.RAX)));
+        instr(new Shift(reg, (byte)flagIdx, true));
+        instr(new And(new ModRMSIB(reg, true), 1));
+        if (flip) instr(new Xor(new ModRMSIB(Reg64.RAX, true), 1));
+        return startIdx;
     }
 
     @Override
     public Object visitBinaryExpr(BinaryExpr expr, Object arg) {
         expr.asmOffset = asm.getSize();
+        expr.left.visit(this, arg);
+        expr.right.visit(this, arg);
+        instr(new Pop(Reg64.RCX));
+        instr(new Pop(Reg64.RAX));
+        switch (expr.operator.kind) {
+            case Add:
+                instr(new Add(new ModRMSIB(Reg64.RAX, Reg64.RCX)));
+                break;
+            case Minus:
+                instr(new Sub(new ModRMSIB(Reg64.RAX, Reg64.RCX)));
+                break;
+            case Multiply:
+                instr(new Imul(Reg64.RAX, new ModRMSIB(Reg64.RCX, true)));
+                break;
+            case Divide:
+                instr(new Idiv(new ModRMSIB(Reg64.RCX, true)));
+                break;
+            case RelEq:
+                instr(new Cmp(new ModRMSIB(Reg64.RAX, Reg64.RCX)));
+                // ZF
+                getFlag(Reg64.RAX, 6, false);
+                break;
+            case RelLT:
+                instr(new Cmp(new ModRMSIB(Reg64.RAX, Reg64.RCX)));
+                // OF
+                getFlag(Reg64.RAX, 11, false);
+                break;
+            case RelGT:
+                instr(new Cmp(new ModRMSIB(Reg64.RAX, Reg64.RCX)));
+                // !ZF & !OF
+                getFlag(Reg64.RCX, 11, true);
+                getFlag(Reg64.RAX, 6, true);
+                instr(new And(new ModRMSIB(Reg64.RAX, Reg64.RCX)));
+                break;
+            case RelLEq:
+                instr(new Cmp(new ModRMSIB(Reg64.RAX, Reg64.RCX)));
+                // ZF | OF
+                getFlag(Reg64.RCX, 11, false);
+                getFlag(Reg64.RAX, 6, false);
+                instr(new Or(new ModRMSIB(Reg64.RAX, Reg64.RCX)));
+                break;
+            case RelGEq:
+                instr(new Cmp(new ModRMSIB(Reg64.RAX, Reg64.RCX)));
+                // !OF
+                getFlag(Reg64.RAX, 11, true);
+                break;
+            default:
+                throw new CodeGenerationError(String.format("operator %s not supported\n", expr.operator));
+        }
+        instr(new Push(Reg64.RAX));
         return null;
     }
 
     @Override
     public Object visitRefExpr(RefExpr expr, Object arg) {
         expr.asmOffset = asm.getSize();
+        expr.ref.visit(this, arg);
+        instr(new Pop(Reg64.RAX));
+        instr(new Mov_rrm(new ModRMSIB(Reg64.RAX, 0, Reg64.RAX)));
+        instr(new Push(Reg64.RAX));
         return null;
     }
 
     @Override
     public Object visitIxExpr(IxExpr expr, Object arg) {
         expr.asmOffset = asm.getSize();
+        // TODO
         return null;
     }
 
     @Override
     public Object visitCallExpr(CallExpr expr, Object arg) {
         expr.asmOffset = asm.getSize();
+        handleCall(expr.argList, expr.functionRef);
         return null;
     }
 
     @Override
     public Object visitLiteralExpr(LiteralExpr expr, Object arg) {
         expr.asmOffset = asm.getSize();
+        int val = (Integer)expr.lit.visit(this, arg);
+        instr(new Mov_rmi(new ModRMSIB(Reg64.RAX, true), val));
+        instr(new Push(Reg64.RAX));
         return null;
     }
 
     @Override
     public Object visitNewObjectExpr(NewObjectExpr expr, Object arg) {
         expr.asmOffset = asm.getSize();
+        addMalloc();
+        instr(new Push(Reg64.RAX));
         return null;
     }
 
     @Override
     public Object visitNewArrayExpr(NewArrayExpr expr, Object arg) {
         expr.asmOffset = asm.getSize();
+        expr.sizeExpr.visit(this, arg);
+        addMalloc();
+        instr(new Pop(Reg64.RCX));
+
+        // set size
+        instr(new Lea(new ModRMSIB(Reg64.RAX, 0, Reg64.RDI)));
+        instr(new Mov_rmr(new ModRMSIB(Reg64.RDI, 0, Reg64.RCX)));
+        instr(new Add(new ModRMSIB(Reg64.RDI, true), 8));
+
+        // set default values
+        instr(new Xor(new ModRMSIB(Reg64.RAX, Reg64.RAX)));
+        instr(new ClearDirFlag());
+        instr(new Rep());
+
+        instr(new Push(Reg64.RDI));
         return null;
     }
 
     @Override
     public Object visitThisRef(ThisRef ref, Object arg) {
         ref.asmOffset = asm.getSize();
+        ref.decl.memOffset = thisMemOffset;
+        instr(new Lea(new ModRMSIB(Reg64.RBP, thisMemOffset, Reg64.RAX)));
+        instr(new Push(Reg64.RAX));
         return null;
+    }
+
+    // push ref address onto stack
+    // for case of method decl, pushes context object if nonstatic and nothing otherwise
+    // clobbers RAX and RDI
+    void pushRefAddress(Reference ref) {
+        // load ref address into rax
+        if (ref.decl instanceof ClassDecl) {
+            instr(new Lea(new ModRMSIB(Reg64.R15, (int) ref.decl.memOffset, Reg64.RAX)));
+        } else if (ref.decl instanceof FieldDecl) {
+            if (((FieldDecl) ref.decl).isStatic) {
+                instr(new Lea(new ModRMSIB(Reg64.R15, (int) ref.decl.memOffset, Reg64.RAX)));
+            } else {
+                instr(new Mov_rrm(new ModRMSIB(Reg64.RBP, thisMemOffset, Reg64.RSI)));
+                instr(new Lea(new ModRMSIB(Reg64.RSI, (int) ref.decl.memOffset, Reg64.RAX)));
+            }
+        } else if (ref.decl instanceof LocalDecl) {
+            instr(new Lea(new ModRMSIB(Reg64.RBP, (int) ref.decl.memOffset, Reg64.RAX)));
+        } else if (ref.decl instanceof MethodDecl) {
+            MethodDecl method = (MethodDecl)ref.decl;
+            if (method.isStatic) return;
+            if (ref instanceof QualRef) {
+                ((QualRef)ref).ref.visit(this, null);
+                return;
+            } else if (ref instanceof IdRef) {
+                instr(new Lea(new ModRMSIB(Reg64.RBP, thisMemOffset, Reg64.RAX)));
+            }
+        } else {
+            throw new CodeGenerationError(String.format("unknown declaration subclass for ref %s", ref.decl.name));
+        }
+
+        // push ref address onto stack
+        instr(new Push(Reg64.RAX));
     }
 
     @Override
     public Object visitIdRef(IdRef ref, Object arg) {
         ref.asmOffset = asm.getSize();
+        pushRefAddress(ref);
         return null;
     }
 
     @Override
     public Object visitQRef(QualRef ref, Object arg) {
         ref.asmOffset = asm.getSize();
+        pushRefAddress(ref);
         return null;
     }
 
     @Override
     public Object visitIdentifier(Identifier id, Object arg) {
-        id.asmOffset = asm.getSize();
-        return null;
+        throw new CodeGenerationError("visitIdentifier should not be called");
     }
 
     @Override
     public Object visitOperator(Operator op, Object arg) {
-        op.asmOffset = asm.getSize();
-        return null;
+        throw new CodeGenerationError("visitOperator should not be called");
     }
 
     @Override
     public Object visitIntLiteral(IntLiteral num, Object arg) {
         num.asmOffset = asm.getSize();
-        return null;
+        return Integer.valueOf(num.spelling);
     }
 
     @Override
     public Object visitBooleanLiteral(BooleanLiteral bool, Object arg) {
         bool.asmOffset = asm.getSize();
-        return null;
+        return bool.spelling.equals("true") ? 1 : 0;
     }
 
     @Override
     public Object visitNullLiteral(NullLiteral nullLiteral, Object arg) {
         nullLiteral.asmOffset = asm.getSize();
-        return null;
+        return 0;
     }
 }

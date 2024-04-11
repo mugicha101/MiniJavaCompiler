@@ -40,8 +40,8 @@ public class ELFMaker {
 		// next is the .text
 		text.sectionName = ".text";
 		text.sh_size = textSize;
-		text.sh_type = SHT_PROGBITS; // TODO: what type is the text section?
-		text.sh_flags = SHF_ALLOC | SHF_EXECINSTR; // TODO: what flags does the text section get?
+		text.sh_type = SHT_PROGBITS;
+		text.sh_flags = SHF_ALLOC | SHF_EXECINSTR;
 		text.data = new byte[1]; // placeholder, do not change
 		sections.add( text );
 		
@@ -49,14 +49,14 @@ public class ELFMaker {
 		bss.sectionName = ".bss";
 		bss.data = null;
 		bss.sh_size = bssSize;
-		bss.sh_type = SHT_NOBITS; // TODO: what type is the bss section?
-		bss.sh_flags = SHF_ALLOC | SHF_WRITE; // TODO: what are the flags of the bss section?
+		bss.sh_type = SHT_NOBITS;
+		bss.sh_flags = SHF_ALLOC | SHF_WRITE;
 		sections.add( bss );
 		
 		// make .shstrtab
 		shstrtab.sectionName = ".shstrtab";
-		shstrtab.sh_type = SHT_STRTAB; // TODO: what is the type of the shstrtab section?
-		shstrtab.sh_flags = 0; // TODO: what are the flags of this section?
+		shstrtab.sh_type = SHT_STRTAB;
+		shstrtab.sh_flags = 0;
 		sections.add( shstrtab );
 		shstrtab.data = makeSectionStrings(sections);
 		shstrtab.sh_size = shstrtab.data.length;
@@ -96,8 +96,8 @@ public class ELFMaker {
 		
 		text.data = textSection;
 		
-		phdr.p_type = PT_PHDR; // TODO: what is the type of the program header segment?
-		phdr.p_flags = PF_R; // TODO: what are the flags of the program header segment?
+		phdr.p_type = PT_PHDR;
+		phdr.p_flags = PF_R;
 		phdr.p_offset = phStartAddress;
 		phdr.p_vaddr = phStartAddress;
 		phdr.p_paddr = phStartAddress;
@@ -112,8 +112,8 @@ public class ELFMaker {
 		phdrLoad.p_filesz = phdr.p_filesz;
 		phdrLoad.p_memsz = phdr.p_memsz;
 		
-		textSeg.p_type = PT_LOAD; // TODO: type of the text segment?
-		textSeg.p_flags = PF_R | PF_X; // TODO: flags for the text segment?
+		textSeg.p_type = PT_LOAD;
+		textSeg.p_flags = PF_R | PF_X;
 		textSeg.p_offset = text.sh_offset;
 		textSeg.p_vaddr = text.sh_addr;
 		textSeg.p_paddr = text.sh_addr;
@@ -349,7 +349,7 @@ public class ELFMaker {
 		e.data = null;
 		
 		e.sh_name = 0;
-		e.sh_type = SHT_NULL; // TODO: what type is the null section?
+		e.sh_type = SHT_NULL;
 		e.sh_flags = 0;
 		e.sh_addr = 0;
 		e.sh_offset = 0;

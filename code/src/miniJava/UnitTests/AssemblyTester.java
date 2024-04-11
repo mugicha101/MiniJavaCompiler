@@ -100,6 +100,19 @@ public class AssemblyTester {
         check(new Rep(), new byte[]{(byte)0xf3, (byte)0x48, (byte)0xab});
         System.out.println("rep stosq passed");
 
+        // lahf
+        check(new LoadFlags(), new byte[]{(byte)0x9f});
+        System.out.println("lahf passed");
+
+        // shift
+        for (int i = 0; i < 16; ++i) {
+            for (int j = 0; j < 256; ++j) {
+                check(new Shift(regs[i], (byte)j, false), new byte[]{(byte)(i < 8 ? 0x48 : 0x49), (byte)0xc1, (byte)(0xe0 + (i & 0x111)), (byte)j});
+                check(new Shift(regs[i], (byte)j, true), new byte[]{(byte)(i < 8 ? 0x48 : 0x49), (byte)0xc1, (byte)(0xe8 + (i & 0x111)), (byte)j});
+            }
+        }
+        System.out.println("shift passed");
+
         // test elf (produce program that does nothing)
         ErrorReporter errors = new ErrorReporter();
         InstructionList asm = new InstructionList();

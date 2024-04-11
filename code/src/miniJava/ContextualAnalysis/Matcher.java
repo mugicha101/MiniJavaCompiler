@@ -50,20 +50,18 @@ public class Matcher implements Visitor<IdTable, Object> {
         return null;
     }
 
-    void addPredefined(IdTable idTable) {
+    void addPredefined(Package prog) {
         ClassDecl SystemDecl = new ClassDecl("System", new FieldDeclList(), new MethodDeclList(), PREDEF_POSN);
         SystemDecl.fieldDeclList.add(new FieldDecl(false, true, new ClassType(new Identifier(new Token(TokenType.Identifier, "_PrintStream", PREDEF_POSN.line, PREDEF_POSN.offset)), PREDEF_POSN), "out", PREDEF_POSN));
         ClassDecl PrintStreamDecl = new ClassDecl("_PrintStream", new FieldDeclList(), new MethodDeclList(), PREDEF_POSN);
-        PrintStreamDecl.methodDeclList.add(new MethodDecl(new FieldDecl(false, false, new BaseType(TypeKind.VOID, PREDEF_POSN), "println", PREDEF_POSN), new ParameterDeclList(), new StatementList(), PREDEF_POSN));
+        MethodDecl.printlnMethod = new MethodDecl(new FieldDecl(false, false, new BaseType(TypeKind.VOID, PREDEF_POSN), "println", PREDEF_POSN), new ParameterDeclList(), new StatementList(), PREDEF_POSN);
+        PrintStreamDecl.methodDeclList.add(MethodDecl.printlnMethod);
         PrintStreamDecl.methodDeclList.get(0).parameterDeclList.add(new ParameterDecl(new BaseType(TypeKind.INT, PREDEF_POSN), "n", PREDEF_POSN));
         ClassDecl StringDecl = new ClassDecl("String", new FieldDeclList(), new MethodDeclList(), PREDEF_POSN);
         StringDecl.unsupported = true;
-        idTable.addClassDecl(SystemDecl);
-        idTable.addScopedDecl(SystemDecl);
-        idTable.addClassDecl(PrintStreamDecl);
-        idTable.addScopedDecl(PrintStreamDecl);
-        idTable.addClassDecl(StringDecl);
-        idTable.addScopedDecl(StringDecl);
+        prog.classDeclList.add(SystemDecl);
+        prog.classDeclList.add(PrintStreamDecl);
+        prog.classDeclList.add(StringDecl);
     }
 
     public void match(AST ast) {
@@ -71,7 +69,6 @@ public class Matcher implements Visitor<IdTable, Object> {
         activeMethod = null;
         staticActive = false;
         IdTable idTable = new IdTable();
-        addPredefined(idTable);
         try {
             ast.visit(this, idTable);
         } catch (IdentificationError idErr) {
@@ -82,6 +79,7 @@ public class Matcher implements Visitor<IdTable, Object> {
 
     @Override
     public Object visitPackage(Package prog, IdTable arg) {
+        addPredefined(prog);
         for (ClassDecl classDecl : prog.classDeclList) {
             arg.addClassDecl(classDecl);
             arg.addScopedDecl(classDecl);
@@ -103,10 +101,14 @@ public class Matcher implements Visitor<IdTable, Object> {
             arg.addScopedDecl(methodDecl);
 
         // identify
-        for (FieldDecl fieldDecl : cd.fieldDeclList)
+        for (FieldDecl fieldDecl : cd.fieldDeclList) {
+            fieldDecl.parent = cd;
             fieldDecl.visit(this, arg);
-        for (MethodDecl methodDecl : cd.methodDeclList)
+        }
+        for (MethodDecl methodDecl : cd.methodDeclList) {
+            methodDecl.parent = cd;
             methodDecl.visit(this, arg);
+        }
 
         arg.closeScope();
         activeClass = null;
@@ -386,7 +388,8 @@ public class Matcher implements Visitor<IdTable, Object> {
     public Object visitThisRef(ThisRef ref, IdTable arg) {
         if (staticActive)
             throw new IdentificationError(ref.posn, "Cannot reference this in a static context");
-        return new VarDecl(new ClassType(new Identifier(new Token(TokenType.Identifier, activeClass.name, PREDEF_POSN.line, PREDEF_POSN.offset)), PREDEF_POSN), "this", PREDEF_POSN);
+        ref.decl = new VarDecl(new ClassType(new Identifier(new Token(TokenType.Identifier, activeClass.name, PREDEF_POSN.line, PREDEF_POSN.offset)), PREDEF_POSN), "this", PREDEF_POSN);
+        return ref.decl;
     }
 
     @Override
@@ -396,7 +399,8 @@ public class Matcher implements Visitor<IdTable, Object> {
             if (decl instanceof MemberDecl && !((MemberDecl)decl).isStatic)
                 throw new IdentificationError(ref.posn, String.format("member %s.%s is not accessible from static context", activeClass.name, ref.id.spelling));
         }
-        return ref.id.visit(this, arg);
+        ref.decl = (Declaration)ref.id.visit(this, arg);
+        return ref.decl;
     }
 
     @Override
@@ -419,6 +423,7 @@ public class Matcher implements Visitor<IdTable, Object> {
             throw new IdentificationError(ref.id.posn, String.format("Cannot non-static member %s from class %s", decl.name, className));
         if (decl.isPrivate && !isActiveClass)
             throw new IdentificationError(ref.id.posn, String.format("%s.%s is private", className, decl.name));
+        ref.decl = decl;
         return decl;
     }
 

@@ -5,18 +5,22 @@ import miniJava.CodeGeneration.x64.Instruction;
 import miniJava.CodeGeneration.x64.x64;
 
 public class CondJmp extends Instruction {
+	public final Condition cond;
 	public CondJmp(Condition cond, byte rel8) {
+		this.cond = cond;
 		opcodeBytes.write(getImm32Opcode(cond) - 0x10);
 		immBytes.write(rel8);
 	}
 	
 	public CondJmp(Condition cond, int rel32) {
+		this.cond = cond;
 		opcodeBytes.write(0x0F);
 		opcodeBytes.write(getImm32Opcode(cond));
 		x64.writeInt(immBytes,rel32);
 	}
 	
 	public CondJmp(Condition cond, int curAddr, int destAddr, boolean asByte) {
+		this.cond = cond;
 		if( asByte ) {
 			opcodeBytes.write( getImm32Opcode(cond) - 0x10 );
 			immBytes.write( destAddr - curAddr - 2 );

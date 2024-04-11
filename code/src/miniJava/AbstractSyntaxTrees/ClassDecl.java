@@ -9,6 +9,7 @@ import  miniJava.SyntacticAnalyzer.SourcePosition;
 
 public class ClassDecl extends Declaration {
   public boolean unsupported;
+  public long memSize; // size of class in memory (in bytes)
   public ClassDecl(String cn, FieldDeclList fdl, MethodDeclList mdl, SourcePosition posn) {
 	  super(cn, null, posn);
 	  fieldDeclList = fdl;
