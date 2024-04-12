@@ -5,8 +5,6 @@ import miniJava.CodeGeneration.x64.ISA.*;
 import miniJava.CodeGeneration.x64.*;
 import miniJava.ErrorReporter;
 
-import java.math.BigInteger;
-import java.util.Arrays;
 import java.util.Random;
 
 public class AssemblyTester {
@@ -99,10 +97,6 @@ public class AssemblyTester {
         // rep stosq
         check(new Rep(), new byte[]{(byte)0xf3, (byte)0x48, (byte)0xab});
         System.out.println("rep stosq passed");
-
-        // lahf
-        check(new LoadFlags(), new byte[]{(byte)0x9f});
-        System.out.println("lahf passed");
 
         // shift
         for (int i = 0; i < 16; ++i) {

@@ -3,14 +3,23 @@
  * int arithmetic
  */
 class MainClass {
-   public static void main (String [] args) {
-	   int var0 = 48;
-       int var1 = 1;
-       int var2 = 2 * var1;
-       int var3 = 9 / 2;
-       System.out.println (var0 + var2);
-       System.out.println (var0 + var3);
-   }
+    public static void main (String [] args) {
+        int x = 0;
+        while (x < 10) {
+            foo(x);
+            x = x + 1;
+        }
+    }
+
+    public static void foo(int x) {
+        System.out.println(48 + x);
+        System.out.println(32);
+        if (x != 5)
+            System.out.println(49);
+        else
+            System.out.println(48);
+        System.out.println(10);
+    }
 }
 
 
