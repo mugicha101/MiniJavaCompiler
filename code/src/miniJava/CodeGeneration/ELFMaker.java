@@ -20,7 +20,6 @@ public class ELFMaker {
 	private ELFSection bss = new ELFSection();
 	private ELFSection shstrtab = new ELFSection();
 	private ELFSegment phdr = new ELFSegment();
-	private ELFSegment phdrLoad = new ELFSegment();
 	private ELFSegment textSeg = new ELFSegment();
 	private long phStartAddress = 0x40;
 	private long shStartAddress;
@@ -103,17 +102,9 @@ public class ELFMaker {
 		phdr.p_paddr = phStartAddress;
 		phdr.p_filesz = segments.size() * elf.e_phentsize;
 		phdr.p_memsz = phdr.p_filesz;
-
-		phdrLoad.p_type = PT_LOAD;
-		phdrLoad.p_flags = PF_R;
-		phdrLoad.p_offset = phdr.p_offset;
-		phdrLoad.p_vaddr = phdr.p_vaddr;
-		phdrLoad.p_paddr = phdr.p_paddr;
-		phdrLoad.p_filesz = phdr.p_filesz;
-		phdrLoad.p_memsz = phdr.p_memsz;
 		
 		textSeg.p_type = PT_LOAD;
-		textSeg.p_flags = PF_R | PF_X;
+		textSeg.p_flags = PF_R | PF_X | PF_W; // write active due to stack base being stored at beginning
 		textSeg.p_offset = text.sh_offset;
 		textSeg.p_vaddr = text.sh_addr;
 		textSeg.p_paddr = text.sh_addr;

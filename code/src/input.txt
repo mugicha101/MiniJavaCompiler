@@ -1,7 +1,11 @@
 class MainClass {
+    static int a;
+    static int b;
     public static void main(String[] args) {
-        NumPrint.printd(727);
-        NumPrint.printx(1831);
+        a = 727;
+        NumPrint.printd(a);
+        b = 1831;
+        NumPrint.printx(b);
     }
 }
 class NumPrint {

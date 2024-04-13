@@ -11,10 +11,10 @@ import miniJava.SyntacticAnalyzer.SourcePosition;
 import miniJava.SyntacticAnalyzer.Token;
 import miniJava.SyntacticAnalyzer.TokenType;
 
+import java.io.ByteArrayOutputStream;
 import java.util.*;
 
 public class Codifier implements Visitor<Object, Object> {
-    private final boolean CALL_REG_DUMP = false; // true if entry time registers pushed on call
     private static class UnresolvedAddress {
         public static Map<String,Integer> labelMap = new HashMap<>();
         enum Type {CALL, JMP, COND_JMP};
@@ -166,8 +166,14 @@ public class Codifier implements Visitor<Object, Object> {
             UnresolvedAddress.labelMap.clear();
             nextNonce = 0;
 
-            // store stack base at r15
-            instr(new Mov_rmr(new ModRMSIB(Reg64.R15, Reg64.RSP)));
+            // store stack base address at text segment base (used for accessing static vars at the bottom of the stack)
+            // add 8 bytes of padding (where the stack base is stored, entry point is after this padding)
+            instr(new CustomInstruction(new byte[] {}, (long)0));
+            // store stack base instruction: mov [rip-8],rsp
+            instr(new CustomInstruction(
+                    new byte[] {(byte)0x48, (byte)0x89, (byte)0x25},
+                    new byte[] {(byte)0xf8, (byte)0xff, (byte)0xff, (byte)0xff}
+            ));
 
             // resolve fields (add statics below main stackframe)
             long stackBase = 0;
@@ -191,7 +197,8 @@ public class Codifier implements Visitor<Object, Object> {
             System.out.printf("stack base: %d\n", stackBase);
 
             // add call to main (copy arg passed into main to top of stack)
-            instr(new Mov_rrm(new ModRMSIB(Reg64.R15, -8, Reg64.RAX)));
+            loadStackBase(Reg64.RAX);
+            instr(new Mov_rrm(new ModRMSIB(Reg64.RAX, -8, Reg64.RAX)));
             instr(new Push(Reg64.RAX));
             addUnresolved(instr(new Call(0,0)), mainMethod);
 
@@ -214,6 +221,17 @@ public class Codifier implements Visitor<Object, Object> {
         }
     }
 
+    // load stack base address into reg
+    private void loadStackBase(Reg64 reg) {
+        long offset = asm.getSize();
+        offset = (offset ^ 0xffffffffL) + 1;
+        // mov rax,[rip-<asm.getSize()>]
+        instr(new CustomInstruction(
+                new byte[] {(byte)(reg.getIdx() < 8 ? 0x48 : 0x4c), (byte)0x8b, (byte)(0x05 + ((reg.getIdx() & 0b111) << 3))},
+                new byte[] {(byte)offset, (byte)(offset >> 8), (byte)(offset >> 16), (byte)(offset >> 24)}
+        ));
+    }
+
     String genNonce() {
         String nonce = Long.toString(nextNonce++);
         return nonce;
@@ -221,7 +239,7 @@ public class Codifier implements Visitor<Object, Object> {
 
     public void makeElf(String fname) {
         ELFMaker elf = new ELFMaker(errors, asm.getSize(), 8); // bss ignored until PA5, set to 8
-        elf.outputELF(fname, asm.getBytes(), 0);
+        elf.outputELF(fname, asm.getBytes(), 8);
     }
 
     private int instr(Instruction instr) {
@@ -262,23 +280,19 @@ public class Codifier implements Visitor<Object, Object> {
         return idxStart;
     }
 
-    /*  stackframe structure (on entry)
-        METHOD ARGS (first arg = lowest addr)
-        +0x40+ (if CALL_REG_DUMP false, +0x10+)
-        ENTRY TIME REGISTERS (if CALL_REG_DUMP)
-        +0x38 RDI
-        +0x30 RSI
-        +0x28 RBX
-        +0x20 RDX
-        +0x18 RCX
-        +0x10 RAX
+    /*  example stackframe structure (on entry)
+        +0x?? this (last argument)
+        ...
+        +0x20 arg 2
+        +0x18 arg 1
+        +0x10 arg 0 <- RBP + ARG_OFFSET
         +0x08 RIP (Return Addr)
         +0x00 RBP (Last Frame RBP) <- RBP
         LOCAL VARIABLES
         -0x16 --- <- RSP
      */
 
-    final int ARG_OFFSET = CALL_REG_DUMP ? 0x40 : 0x10; // RBP - ARG_OFFSET = address of first argument
+    final int ARG_OFFSET = 0x10;
 
     @Override
     public Object visitPackage(Package prog, Object arg) {
@@ -323,16 +337,6 @@ public class Codifier implements Visitor<Object, Object> {
         System.out.printf("method %s.%s address: 0x%x\n", md.parent.name, md.name, md.asmOffset+0x1b0);
 
         // PROLOGUE
-        // store entry time register values onto stack
-        if (CALL_REG_DUMP) {
-            instr(new Push(Reg64.RDI));
-            instr(new Push(Reg64.RSI));
-            instr(new Push(Reg64.RBX));
-            instr(new Push(Reg64.RDX));
-            instr(new Push(Reg64.RCX));
-            instr(new Push(Reg64.RAX));
-        }
-
         // update rbp and rsp
         instr(new Push(Reg64.RBP)); // push rbp
         instr(new Mov_rmr(new ModRMSIB(Reg64.RBP, Reg64.RSP))); // mov rbp,rsp
@@ -372,16 +376,6 @@ public class Codifier implements Visitor<Object, Object> {
         // update rbp and rsp
         instr(new Mov_rmr(new ModRMSIB(Reg64.RSP, Reg64.RBP))); // mov rsp,rbp (pop all local variables)
         instr(new Pop(Reg64.RBP)); // pop rbp
-
-        // restore entry time registers
-        if (CALL_REG_DUMP) {
-            instr(new Pop(Reg64.RAX));
-            instr(new Pop(Reg64.RCX));
-            instr(new Pop(Reg64.RDX));
-            instr(new Pop(Reg64.RBX));
-            instr(new Pop(Reg64.RSI));
-            instr(new Pop(Reg64.RDI));
-        }
 
         instr(new Ret());
         return null;
@@ -721,10 +715,12 @@ public class Codifier implements Visitor<Object, Object> {
     void pushRefAddress(Reference ref) {
         // load ref address into rax
         if (ref.decl instanceof ClassDecl) {
-            instr(new Lea(new ModRMSIB(Reg64.R15, (int) ref.decl.memOffset, Reg64.RAX)));
+            loadStackBase(Reg64.RAX);
+            instr(new Lea(new ModRMSIB(Reg64.RAX, (int) ref.decl.memOffset, Reg64.RAX)));
         } else if (ref.decl instanceof FieldDecl) {
             if (((FieldDecl) ref.decl).isStatic) {
-                instr(new Lea(new ModRMSIB(Reg64.R15, (int) ref.decl.memOffset, Reg64.RAX)));
+                loadStackBase(Reg64.RAX);
+                instr(new Lea(new ModRMSIB(Reg64.RAX, (int) ref.decl.memOffset, Reg64.RAX)));
             } else {
                 if (ref instanceof QualRef) {
                     ((QualRef)ref).ref.visit(this, null);
