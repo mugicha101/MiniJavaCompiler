@@ -1,45 +1,52 @@
-/**
- * COMP 520
- * Field reference and update
- */
 class MainClass {
-   public static void main (String [] args) {
-
-      FirstClass f = new FirstClass ();
-      f.s = new SecondClass ();
-      f.s.f = f;
-
-      f.testme ();
-   }
+    public static void main(String[] args) {
+        NumPrint.printd(727);
+        NumPrint.printx(1831);
+    }
 }
+class NumPrint {
+    private static void print(int x, int mod) {
+        if (x == 0) {
+            System.out.println(48);
+            return;
+        }
+        if (x < 0) {
+            x = -x;
+            System.out.println(45);
+        }
+        int digs = 0;
+        int t = x;
+        int m = 1;
+        while (t > 0) {
+            digs = digs + 1;
+            t = t / mod;
+            m = m * mod;
+        }
+        int[] arr = new int[digs];
+        int i = 0;
+        int s = 0;
+        while (i < digs) {
+            m = m / mod;
+            arr[i] = x / m - s;
+            if (arr[i] >= 10) {
+                System.out.println(arr[i]+87);
+            } else {
+                System.out.println(arr[i]+48);
+            }
+            s = s + arr[i];
+            i = i + 1;
+            s = s * mod;
+        }
+        System.out.println(10);
+    }
 
-class FirstClass
-{
-   int n;
-   SecondClass s;
+    public static void printd(int x) {
+        print(x, 10);
+    }
 
-   public void testme ()
-   {
-      int tstvar = 48;
-      System.out.println(tstvar);
-      n = 49;
-      System.out.println(n);
-      s = s;
-      System.out.println(48);
-      s.f = s.f;
-      System.out.println(49);
-      s.f.n = s.f.n;
-      System.out.println(50);
-      tstvar = s.f.n;
-      System.out.println(tstvar);
-	  System.out.println(tstvar);
-   }
-
+    public static void printx(int x) {
+        System.out.println(48);
+        System.out.println(120);
+        print(x, 16);
+    }
 }
-
-class SecondClass
-{
-   int n;
-   FirstClass f;
-}
-

@@ -492,7 +492,7 @@ public class Codifier implements Visitor<Object, Object> {
         for (int i = argList.size()-1; i >= 0; i--) {
             argList.get(i).visit(this, null);
         }
-        addUnresolved(instr(new Call(0, 0)), (MethodDecl)methodRef.decl);
+        addUnresolved(instr(new Call(0, 0)), methodRef.decl);
         if (argBytes > 0) instr(new Add(new ModRMSIB(Reg64.RSP, true), argBytes));
     }
 
@@ -602,8 +602,14 @@ public class Codifier implements Visitor<Object, Object> {
                 instr(new Imul(Reg64.RAX, new ModRMSIB(Reg64.RCX, true)));
                 break;
             case Divide:
+                instr(new Xor(new ModRMSIB(Reg64.RDX, Reg64.RDX)));
                 instr(new Idiv(new ModRMSIB(Reg64.RCX, true)));
                 break;
+            case LogAnd:
+                instr(new And(new ModRMSIB(Reg64.RAX, Reg64.RCX)));
+                break;
+            case LogOr:
+                instr(new Or(new ModRMSIB(Reg64.RAX, Reg64.RCX)));
             case RelEq:
                 cond = Condition.E;
                 break;
@@ -623,7 +629,7 @@ public class Codifier implements Visitor<Object, Object> {
                 cond = Condition.GTE;
                 break;
             default:
-                throw new CodeGenerationError(String.format("binary operator %s not supported\n", expr.operator));
+                throw new CodeGenerationError(String.format("binary operator %s not supported\n", expr.operator.spelling));
         }
         if (cond != null) {
             instr(new Cmp(new ModRMSIB(Reg64.RAX, Reg64.RCX)));
@@ -735,12 +741,15 @@ public class Codifier implements Visitor<Object, Object> {
         } else if (ref.decl instanceof MethodDecl) {
             MethodDecl method = (MethodDecl)ref.decl;
             if (method.isStatic) return;
+
+            // push 'this'
             if (ref instanceof QualRef) {
                 ((QualRef)ref).ref.visit(this, null);
-                return;
+                instr(new Pop(Reg64.RAX));
             } else if (ref instanceof IdRef) {
                 instr(new Lea(new ModRMSIB(Reg64.RBP, thisMemOffset, Reg64.RAX)));
             }
+            instr(new Mov_rrm(new ModRMSIB(Reg64.RAX, 0, Reg64.RAX)));
         } else {
             throw new CodeGenerationError(String.format("unknown declaration subclass for ref %s", ref.decl.name));
         }
