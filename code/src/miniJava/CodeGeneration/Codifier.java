@@ -502,7 +502,7 @@ public class Codifier implements Visitor<Object, Object> {
         stmt.asmOffset = asm.getSize();
         if (stmt.returnExpr != null) {
             stmt.returnExpr.visit(this, arg);
-            instr(new Pop(Reg64.R8));
+            instr(new Pop(Reg64.RAX));
         }
         addUnresolved(instr(new Jmp(0,0,false)), String.format("%s.%s.epilogue", currentClass.name, currentMethod.name));
         return null;
@@ -657,7 +657,7 @@ public class Codifier implements Visitor<Object, Object> {
     public Object visitCallExpr(CallExpr expr, Object arg) {
         expr.asmOffset = asm.getSize();
         handleCall(expr.argList, expr.functionRef);
-        instr(new Push(Reg64.R8));
+        instr(new Push(Reg64.RAX));
         return null;
     }
 
