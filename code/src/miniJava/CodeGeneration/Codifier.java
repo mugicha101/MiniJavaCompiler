@@ -522,7 +522,7 @@ public class Codifier implements Visitor<Object, Object> {
         stmt.cond.visit(this, arg);
         instr(new Pop(Reg64.RAX));
         instr(new Cmp(new ModRMSIB(Reg64.RAX, true), 0)); // check if false
-        String ifSkipLabel = genNonce();
+        String ifSkipLabel = "ifSkipLabel " + genNonce();
         addUnresolved(instr(new CondJmp(Condition.E, 0, 0, false)), ifSkipLabel); // jump if false
 
         // then
@@ -530,7 +530,7 @@ public class Codifier implements Visitor<Object, Object> {
 
         // else
         if (stmt.elseStmt != null) {
-            String elseEndLabel = genNonce();
+            String elseEndLabel = "elseEndLabel " + genNonce();
             addUnresolved(instr(new Jmp(0, 0, false)), elseEndLabel);
             addLabel(ifSkipLabel);
             stmt.elseStmt.visit(this, arg);
