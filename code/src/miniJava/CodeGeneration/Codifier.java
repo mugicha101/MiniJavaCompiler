@@ -1,5 +1,6 @@
 package miniJava.CodeGeneration;
 
+import com.sun.jdi.ArrayReference;
 import miniJava.AbstractSyntaxTrees.*;
 import miniJava.AbstractSyntaxTrees.Package;
 import miniJava.CodeGeneration.x64.*;
@@ -48,10 +49,10 @@ public class Codifier implements Visitor<Object, Object> {
             }
             switch (type) {
                 case JMP:
-                    newInstr = new Jmp((int)instr.startAddress, targetOffset, true);
+                    newInstr = new Jmp((int)instr.startAddress, targetOffset, false);
                     break;
                 case COND_JMP:
-                    newInstr = new CondJmp(((CondJmp)instr).cond, (int)instr.startAddress, targetOffset, true);
+                    newInstr = new CondJmp(((CondJmp)instr).cond, (int)instr.startAddress, targetOffset, false);
                     break;
                 case CALL:
                     newInstr = new Call((int)instr.startAddress, targetOffset);
@@ -141,6 +142,7 @@ public class Codifier implements Visitor<Object, Object> {
                     // account for main method
                     mainMethod = methodDecl;
                     mainClasses.add(classDecl);
+                    System.out.printf("main class found: %s\n", classDecl.name);
                     break;
                 }
             }
@@ -149,7 +151,7 @@ public class Codifier implements Visitor<Object, Object> {
             if (mainClasses.isEmpty()) {
                 throw new CodeGenerationError("No instances of public static void main(String[]) found");
             }
-            if (mainClasses.size() > 2) {
+            if (mainClasses.size() >= 2) {
                 StringBuilder sb = new StringBuilder("Multiple instances of public static void main(String[]) found: ");
                 for (ClassDecl classDecl : mainClasses) {
                     sb.append(classDecl.name + ", ");
@@ -226,8 +228,8 @@ public class Codifier implements Visitor<Object, Object> {
         return asm.add(instr);
     }
 
-    private long addMalloc() {
-        long idxStart = instr( new Mov_rmi(new ModRMSIB(Reg64.RAX,true),0x09) ); // mmap
+    private int addMalloc() {
+        int idxStart = instr( new Mov_rmi(new ModRMSIB(Reg64.RAX,true),0x09) ); // mmap
 
         instr(new Xor(		new ModRMSIB(Reg64.RDI,Reg64.RDI)) 	); // addr=0
         instr(new Mov_rmi(	new ModRMSIB(Reg64.RSI,true),0x1000) ); // 4kb alloc
@@ -259,8 +261,6 @@ public class Codifier implements Visitor<Object, Object> {
         instr(new Syscall());
         return idxStart;
     }
-
-    // TODO: maybe skip storing registers on stack
 
     /*  stackframe structure (on entry)
         METHOD ARGS (first arg = lowest addr)
@@ -307,14 +307,20 @@ public class Codifier implements Visitor<Object, Object> {
     // adds label at current instruction address
     private void addLabel(String label) {
         UnresolvedAddress.labelMap.put(label, asm.getSize());
-        System.out.printf("label %s: %x\n", label, asm.getSize() + 0x1b0);
+        System.out.printf("label %s: 0x%x\n", label, asm.getSize() + 0x1b0);
+    }
+
+    private void checkThisMemOffset() {
+        if (thisMemOffset == Integer.MIN_VALUE) {
+            throw new IllegalArgumentException("thisMemOffset not defined in context");
+        }
     }
 
     @Override
     public Object visitMethodDecl(MethodDecl md, Object arg) {
         currentMethod = md;
         md.asmOffset = asm.getSize();
-        System.out.printf("method %s.%s address: %x\n", md.parent.name, md.name, md.asmOffset+0x1b0);
+        System.out.printf("method %s.%s address: 0x%x\n", md.parent.name, md.name, md.asmOffset+0x1b0);
 
         // PROLOGUE
         // store entry time register values onto stack
@@ -335,11 +341,13 @@ public class Codifier implements Visitor<Object, Object> {
         int paramOffset = ARG_OFFSET;
         for (ParameterDecl param : md.parameterDeclList) {
             param.memOffset = paramOffset;
-            System.out.printf("param %s: %d\n", param.name, paramOffset);
+            System.out.printf("param %s: 0x%x\n", param.name, paramOffset);
             paramOffset += 8;
         }
-        if (!md.isStatic) {
-            System.out.printf("param this: %d\n", paramOffset);
+        if (md.isStatic) {
+            thisMemOffset = Integer.MIN_VALUE;
+        } else {
+            System.out.printf("param this: 0x%x\n", paramOffset);
             thisMemOffset = paramOffset;
         }
         rbpOffset = 0;
@@ -350,7 +358,6 @@ public class Codifier implements Visitor<Object, Object> {
         if (md == MethodDecl.printlnMethod) {
             // special println segment
             int memOffset = (int)md.parameterDeclList.get(0).memOffset;
-            System.out.println(memOffset);
             instr(new Lea(new ModRMSIB(Reg64.RBP, memOffset, Reg64.RSI)));
             instr(new Mov_rmi(new ModRMSIB(Reg64.RDX, true), 1));
             addPrintln();
@@ -456,10 +463,25 @@ public class Codifier implements Visitor<Object, Object> {
         return null;
     }
 
+    // load address of array element into register reg (can't be RCX)
+    // clobbers RCX
+    private void loadArrayElement(Reference arrRef, Expression ixExpr, Reg64 reg) {
+        if (reg == Reg64.RCX) throw new IllegalArgumentException("loadArrayElement reg cannot be RCX");
+        arrRef.visit(this, null);
+        ixExpr.visit(this, null);
+        instr(new Pop(Reg64.RCX));
+        instr(new Pop(reg));
+        instr(new Mov_rrm(new ModRMSIB(reg, 0, reg)));
+        instr(new Lea(new ModRMSIB(reg, Reg64.RCX, 8, 8, reg)));
+    }
+
     @Override
     public Object visitIxAssignStmt(IxAssignStmt stmt, Object arg) {
         stmt.asmOffset = asm.getSize();
-        // TODO
+        stmt.exp.visit(this, arg);
+        loadArrayElement(stmt.ref, stmt.ix, Reg64.RDI);
+        instr(new Pop(Reg64.RAX));
+        instr(new Mov_rmr(new ModRMSIB(Reg64.RDI, 0, Reg64.RAX)));
         return null;
     }
 
@@ -488,7 +510,7 @@ public class Codifier implements Visitor<Object, Object> {
             stmt.returnExpr.visit(this, arg);
             instr(new Pop(Reg64.R8));
         }
-        addUnresolved(instr(new Jmp(0,0,true)), String.format("%s.%s.epilogue", currentClass.name, currentMethod.name));
+        addUnresolved(instr(new Jmp(0,0,false)), String.format("%s.%s.epilogue", currentClass.name, currentMethod.name));
         return null;
     }
 
@@ -501,7 +523,7 @@ public class Codifier implements Visitor<Object, Object> {
         instr(new Pop(Reg64.RAX));
         instr(new Cmp(new ModRMSIB(Reg64.RAX, true), 0)); // check if false
         String ifSkipLabel = genNonce();
-        addUnresolved(instr(new CondJmp(Condition.E, 0, 0, true)), ifSkipLabel); // jump if false
+        addUnresolved(instr(new CondJmp(Condition.E, 0, 0, false)), ifSkipLabel); // jump if false
 
         // then
         stmt.thenStmt.visit(this, arg);
@@ -509,7 +531,7 @@ public class Codifier implements Visitor<Object, Object> {
         // else
         if (stmt.elseStmt != null) {
             String elseEndLabel = genNonce();
-            addUnresolved(instr(new Jmp(0, 0, true)), elseEndLabel);
+            addUnresolved(instr(new Jmp(0, 0, false)), elseEndLabel);
             addLabel(ifSkipLabel);
             stmt.elseStmt.visit(this, arg);
             addLabel(elseEndLabel);
@@ -524,8 +546,8 @@ public class Codifier implements Visitor<Object, Object> {
         stmt.asmOffset = asm.getSize();
 
         // initial jump
-        String condJmpLabel = genNonce();
-        addUnresolved(instr(new Jmp(0, 0, true)), condJmpLabel);
+        String condJmpLabel = "condJmpLabel " + genNonce();
+        addUnresolved(instr(new Jmp(0, 0, false)), condJmpLabel);
 
         // body
         int loopTopAddress = asm.getSize();
@@ -536,7 +558,7 @@ public class Codifier implements Visitor<Object, Object> {
         stmt.cond.visit(this, arg);
         instr(new Pop(Reg64.RAX));
         instr(new Cmp(new ModRMSIB(Reg64.RAX, true), 1)); // check if true
-        instr(new CondJmp(Condition.E, asm.getSize(), loopTopAddress, true)); // jump if true
+        instr(new CondJmp(Condition.E, asm.getSize(), loopTopAddress, false)); // jump if true
         return null;
     }
 
@@ -557,6 +579,7 @@ public class Codifier implements Visitor<Object, Object> {
             default:
                 throw new CodeGenerationError(String.format("unary operator %s not supported\n", expr.operator));
         }
+        instr(new Push(Reg64.RAX));
         return null;
     }
 
@@ -624,7 +647,9 @@ public class Codifier implements Visitor<Object, Object> {
     @Override
     public Object visitIxExpr(IxExpr expr, Object arg) {
         expr.asmOffset = asm.getSize();
-        // TODO
+        loadArrayElement(expr.ref, expr.ixExpr, Reg64.RAX);
+        instr(new Mov_rrm(new ModRMSIB(Reg64.RAX, 0, Reg64.RAX)));
+        instr(new Push(Reg64.RAX));
         return null;
     }
 
@@ -659,9 +684,10 @@ public class Codifier implements Visitor<Object, Object> {
         expr.sizeExpr.visit(this, arg);
         addMalloc();
         instr(new Pop(Reg64.RCX));
+        instr(new Push(Reg64.RAX));
 
         // set size
-        instr(new Lea(new ModRMSIB(Reg64.RAX, 0, Reg64.RDI)));
+        instr(new Mov_rmr(new ModRMSIB(Reg64.RDI, Reg64.RAX)));
         instr(new Mov_rmr(new ModRMSIB(Reg64.RDI, 0, Reg64.RCX)));
         instr(new Add(new ModRMSIB(Reg64.RDI, true), 8));
 
@@ -670,13 +696,13 @@ public class Codifier implements Visitor<Object, Object> {
         instr(new ClearDirFlag());
         instr(new Rep());
 
-        instr(new Push(Reg64.RDI));
         return null;
     }
 
     @Override
     public Object visitThisRef(ThisRef ref, Object arg) {
         ref.asmOffset = asm.getSize();
+        checkThisMemOffset();
         ref.decl.memOffset = thisMemOffset;
         instr(new Lea(new ModRMSIB(Reg64.RBP, thisMemOffset, Reg64.RAX)));
         instr(new Push(Reg64.RAX));
@@ -694,7 +720,14 @@ public class Codifier implements Visitor<Object, Object> {
             if (((FieldDecl) ref.decl).isStatic) {
                 instr(new Lea(new ModRMSIB(Reg64.R15, (int) ref.decl.memOffset, Reg64.RAX)));
             } else {
-                instr(new Mov_rrm(new ModRMSIB(Reg64.RBP, thisMemOffset, Reg64.RSI)));
+                if (ref instanceof QualRef) {
+                    ((QualRef)ref).ref.visit(this, null);
+                    instr(new Pop(Reg64.RSI));
+                    instr(new Mov_rrm(new ModRMSIB(Reg64.RSI, 0, Reg64.RSI)));
+                } else {
+                    checkThisMemOffset();
+                    instr(new Mov_rrm(new ModRMSIB(Reg64.RBP, thisMemOffset, Reg64.RSI)));
+                }
                 instr(new Lea(new ModRMSIB(Reg64.RSI, (int) ref.decl.memOffset, Reg64.RAX)));
             }
         } else if (ref.decl instanceof LocalDecl) {

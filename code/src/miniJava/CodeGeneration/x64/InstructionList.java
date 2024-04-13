@@ -54,6 +54,7 @@ public class InstructionList {
 		if( oldLen != newLen ) {
 			// very dangerous, maybe even worth reporting
 			_currentSize += newLen - oldLen;
+			throw new IllegalArgumentException("patch changes instruction size!");
 		}
 		newIns.startAddress = old.startAddress;
 		newIns.listIdx = idx;

@@ -1,25 +1,45 @@
 /**
  * COMP 520
- * int arithmetic
+ * Field reference and update
  */
 class MainClass {
-    public static void main (String [] args) {
-        int x = 0;
-        while (x < 10) {
-            foo(x);
-            x = x + 1;
-        }
-    }
+   public static void main (String [] args) {
 
-    public static void foo(int x) {
-        System.out.println(48 + x);
-        System.out.println(32);
-        if (x != 5)
-            System.out.println(49);
-        else
-            System.out.println(48);
-        System.out.println(10);
-    }
+      FirstClass f = new FirstClass ();
+      f.s = new SecondClass ();
+      f.s.f = f;
+
+      f.testme ();
+   }
 }
 
+class FirstClass
+{
+   int n;
+   SecondClass s;
+
+   public void testme ()
+   {
+      int tstvar = 48;
+      System.out.println(tstvar);
+      n = 49;
+      System.out.println(n);
+      s = s;
+      System.out.println(48);
+      s.f = s.f;
+      System.out.println(49);
+      s.f.n = s.f.n;
+      System.out.println(50);
+      tstvar = s.f.n;
+      System.out.println(tstvar);
+	  System.out.println(tstvar);
+   }
+
+}
+
+class SecondClass
+{
+   int n;
+   FirstClass f;
+}
 
