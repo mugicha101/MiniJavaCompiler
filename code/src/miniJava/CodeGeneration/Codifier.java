@@ -711,7 +711,7 @@ public class Codifier implements Visitor<Object, Object> {
 
     // push ref address onto stack
     // for case of method decl, pushes context object if nonstatic and nothing otherwise
-    // clobbers RAX and RDI
+    // clobbers RAX and RSI
     void pushRefAddress(Reference ref) {
         // load ref address into rax
         if (ref.decl instanceof ClassDecl) {
