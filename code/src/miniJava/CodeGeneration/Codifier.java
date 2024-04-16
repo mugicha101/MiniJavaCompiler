@@ -1,6 +1,5 @@
 package miniJava.CodeGeneration;
 
-import com.sun.jdi.ArrayReference;
 import miniJava.AbstractSyntaxTrees.*;
 import miniJava.AbstractSyntaxTrees.Package;
 import miniJava.CodeGeneration.x64.*;
@@ -11,13 +10,12 @@ import miniJava.SyntacticAnalyzer.SourcePosition;
 import miniJava.SyntacticAnalyzer.Token;
 import miniJava.SyntacticAnalyzer.TokenType;
 
-import java.io.ByteArrayOutputStream;
 import java.util.*;
 
 public class Codifier implements Visitor<Object, Object> {
     private static class UnresolvedAddress {
         public static Map<String,Integer> labelMap = new HashMap<>();
-        enum Type {CALL, JMP, COND_JMP};
+        enum Type {CALL, JMP, COND_JMP}
         private final InstructionList asm;
         private final Type type;
         private final Instruction instr;
@@ -63,7 +61,7 @@ public class Codifier implements Visitor<Object, Object> {
             asm.patch(instr.listIdx, newInstr);
         }
     }
-    private ErrorReporter errors;
+    private final ErrorReporter errors;
     private InstructionList asm;
     private MethodDecl mainMethod;
     private List<UnresolvedAddress> unresolvedAddressList;
@@ -154,7 +152,7 @@ public class Codifier implements Visitor<Object, Object> {
             if (mainClasses.size() >= 2) {
                 StringBuilder sb = new StringBuilder("Multiple instances of public static void main(String[]) found: ");
                 for (ClassDecl classDecl : mainClasses) {
-                    sb.append(classDecl.name + ", ");
+                    sb.append(classDecl.name).append(", ");
                 }
                 sb.setLength(sb.length() - 2);
                 throw new CodeGenerationError(sb.toString());
@@ -233,9 +231,8 @@ public class Codifier implements Visitor<Object, Object> {
     }
 
     String genNonce() {
-        String nonce = Long.toString(nextNonce++);
-        return nonce;
-    };
+        return Long.toString(nextNonce++);
+    }
 
     public void makeElf(String fname) {
         ELFMaker elf = new ELFMaker(errors, asm.getSize(), 8); // bss ignored until PA5, set to 8
@@ -246,8 +243,8 @@ public class Codifier implements Visitor<Object, Object> {
         return asm.add(instr);
     }
 
-    private int addMalloc() {
-        int idxStart = instr( new Mov_rmi(new ModRMSIB(Reg64.RAX,true),0x09) ); // mmap
+    private void addMalloc() {
+        instr( new Mov_rmi(new ModRMSIB(Reg64.RAX,true),0x09) ); // mmap
 
         instr(new Xor(		new ModRMSIB(Reg64.RDI,Reg64.RDI)) 	); // addr=0
         instr(new Mov_rmi(	new ModRMSIB(Reg64.RSI,true),0x1000) ); // 4kb alloc
@@ -258,26 +255,20 @@ public class Codifier implements Visitor<Object, Object> {
         instr(new Syscall() );
 
         // pointer to newly allocated memory is in RAX
-        // return the index of the first instruction in this method, if needed
-        return idxStart;
     }
 
     // rdx: # bytes to write
     // rsi: pointer to char buffer
-    private int addPrintln() {
-        int idxStart = asm.getSize();
+    private void addPrintln() {
         instr(new Mov_rmi(new ModRMSIB(Reg64.RAX, true), 1)); // set syscall to SYS_write
         instr(new Mov_rmi(new ModRMSIB(Reg64.RDI, true), 1)); // set output to fd standard out
         instr(new Syscall());
-        return idxStart;
     }
 
-    private int addExit() {
-        int idxStart = asm.getSize();
+    private void addExit() {
         instr(new Mov_rmi(new ModRMSIB(Reg64.RAX, true), 60));
         instr(new Xor(new ModRMSIB(Reg64.RDI, Reg64.RDI)));
         instr(new Syscall());
-        return idxStart;
     }
 
     /*  example stackframe structure (on entry)
@@ -379,18 +370,6 @@ public class Codifier implements Visitor<Object, Object> {
 
         instr(new Ret());
         return null;
-    }
-
-    private int typeSize(TypeDenoter type) {
-        if (type instanceof ClassType) {
-            return 8;
-        }
-        switch (type.typeKind) {
-            case INT: return 4;
-            case BOOLEAN: return 1;
-            case ARRAY: return 8;
-            default: throw new CodeGenerationError(String.format("typeSize called for %s type", type.typeKind));
-        }
     }
 
     @Override
