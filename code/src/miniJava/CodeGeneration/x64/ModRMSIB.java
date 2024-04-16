@@ -183,12 +183,9 @@ public class ModRMSIB {
 	
 	// [rdisp+disp],r
 	private void Make(Reg64 rdisp, int disp, Reg r) {
-		// TODO: construct the byte and write to _b
 		// Operands: [rdisp+disp],r
 		_b.write(constructModRMByte(2, r, rdisp));
 		if (rdisp == Reg64.RSP) {
-			// 0010 1100
-			// 0010 0100
 			_b.write(constructSIBByte(rdisp, rdisp, 1));
 		}
 		x64.writeInt(_b, disp);
@@ -200,8 +197,7 @@ public class ModRMSIB {
 			throw new IllegalArgumentException("Invalid multiplier value: " + mult);
 		if( ridx == Reg64.RSP )
 			throw new IllegalArgumentException("Index cannot be rsp");
-		
-		// TODO: construct the modrm byte and SIB byte
+
 		// Operands: [ridx*mult + disp], r
 		_b.write(constructModRMByte(0, r));
 		_b.write(constructSIBByte(Reg64.RBP, ridx, mult));
@@ -214,8 +210,7 @@ public class ModRMSIB {
 			throw new IllegalArgumentException("Invalid multiplier value: " + mult);
 		if( ridx == Reg64.RSP )
 			throw new IllegalArgumentException("Index cannot be rsp");
-		
-		// TODO: construct the modrm byte and SIB byte
+
 		// Operands: [rdisp + ridx*mult + disp], r
 		_b.write(constructModRMByte(2, r));
 		_b.write(constructSIBByte(rdisp, ridx, mult));
