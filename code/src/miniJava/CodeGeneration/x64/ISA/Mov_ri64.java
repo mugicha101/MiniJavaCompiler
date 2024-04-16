@@ -12,7 +12,7 @@ public class Mov_ri64 extends Instruction {
 		// TODO: second, find the opcode for pop r, where r is a plain 64-bit register
 		// NOTE: x64.getIdx(r) will return a 0-7 index, whereas r.getIdx() returns an index from 0-15
 		rexB |= reg.getIdx() >= 8;
-		opcodeBytes.write(0xb8 + (x64.getIdx(reg) & 0x111));
+		opcodeBytes.write(0xb8 + (x64.getIdx(reg) & 0b111));
 		x64.writeLong(immBytes,imm64);
 	}
 }
