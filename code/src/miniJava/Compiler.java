@@ -11,15 +11,15 @@ import java.io.*;
 
 public class Compiler {
 	// Main function, the file to compile will be an argument.
-	public static void main(String[] args) {
+	public static void main(String[] args) throws FileNotFoundException {
 		ErrorReporter errors = new ErrorReporter();
-		if (args.length == 0) throw new IllegalArgumentException("missing file path");
+		if (args.length == 0) throw new IllegalArgumentException("Missing source code file path");
 		InputStream in;
 		try {
 			File file = new File(args[0]);
 			in = new FileInputStream(file);
 		} catch (IOException e) {
-			throw new RuntimeException("file open error");
+			throw new FileNotFoundException("Source code file not found");
 		}
 		Scanner scanner = new Scanner(in, errors);
 		Parser parser = new Parser(scanner, errors);

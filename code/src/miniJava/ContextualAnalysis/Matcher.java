@@ -71,7 +71,7 @@ public class Matcher implements Visitor<IdTable, Object> {
         IdTable idTable = new IdTable();
         try {
             ast.visit(this, idTable);
-        } catch (IdentificationError idErr) {
+        } catch (MatcherError idErr) {
             errors.clear();
             errors.reportError(idErr.posn, idErr.getMessage());
         }
@@ -191,14 +191,14 @@ public class Matcher implements Visitor<IdTable, Object> {
 
     void checkIsTyped(SourcePosition posn, Declaration decl) {
         if (decl instanceof ClassDecl)
-            throw new IdentificationError(posn, String.format("Class %s has no type", decl.name));
+            throw new MatcherError(posn, String.format("Class %s has no type", decl.name));
         if (decl instanceof MethodDecl)
-            throw new IdentificationError(posn, String.format("Method %s has no type", decl.name));
+            throw new MatcherError(posn, String.format("Method %s has no type", decl.name));
     }
 
     void checkIsCallable(SourcePosition posn, Declaration decl) {
         if (!(decl instanceof MethodDecl))
-            throw new IdentificationError(posn, String.format("%s is not callable", decl.name));
+            throw new MatcherError(posn, String.format("%s is not callable", decl.name));
     }
 
     @Override
@@ -255,7 +255,7 @@ public class Matcher implements Visitor<IdTable, Object> {
 
     void checkIsolatedVarDeclStmt(Statement stmt) {
         if (stmt instanceof VarDeclStmt)
-            throw new IdentificationError(stmt.posn, String.format("Variable %s defined in isolation", ((VarDeclStmt)stmt).varDecl.name));
+            throw new MatcherError(stmt.posn, String.format("Variable %s defined in isolation", ((VarDeclStmt)stmt).varDecl.name));
     }
 
     @Override
@@ -341,7 +341,7 @@ public class Matcher implements Visitor<IdTable, Object> {
         checkIsTyped(expr.ref.posn, refDecl);
         checkTypeMatch("array index", expr.posn, ixType, INT_TYPE);
         if (refDecl.type == null || refDecl.type.typeKind != TypeKind.ARRAY) {
-            throw new IdentificationError(expr.posn, String.format("%s is not an array", TypeChecker.typeStr(refDecl.type)));
+            throw new MatcherError(expr.posn, String.format("%s is not an array", TypeChecker.typeStr(refDecl.type)));
         }
         return ((ArrayType) refDecl.type).eltType;
     }
@@ -387,7 +387,7 @@ public class Matcher implements Visitor<IdTable, Object> {
     @Override
     public Object visitThisRef(ThisRef ref, IdTable arg) {
         if (staticActive)
-            throw new IdentificationError(ref.posn, "Cannot reference this in a static context");
+            throw new MatcherError(ref.posn, "Cannot reference this in a static context");
         ref.decl = new VarDecl(new ClassType(new Identifier(new Token(TokenType.Identifier, activeClass.name, PREDEF_POSN.line, PREDEF_POSN.offset)), PREDEF_POSN), "this", PREDEF_POSN);
         return ref.decl;
     }
@@ -397,7 +397,7 @@ public class Matcher implements Visitor<IdTable, Object> {
         Declaration decl = arg.getScopedDecl(ref.posn, ref.id.spelling);
         if (staticActive) {
             if (decl instanceof MemberDecl && !((MemberDecl)decl).isStatic)
-                throw new IdentificationError(ref.posn, String.format("member %s.%s is not accessible from static context", activeClass.name, ref.id.spelling));
+                throw new MatcherError(ref.posn, String.format("member %s.%s is not accessible from static context", activeClass.name, ref.id.spelling));
         }
         ref.decl = (Declaration)ref.id.visit(this, arg);
         return ref.decl;
@@ -408,10 +408,10 @@ public class Matcher implements Visitor<IdTable, Object> {
         // get ref info
         Declaration refDecl = (Declaration)ref.ref.visit(this, arg);
         if (refDecl instanceof MethodDecl)
-            throw new IdentificationError(ref.ref.posn, String.format("Cannot access members of method %s", refDecl.name));
+            throw new MatcherError(ref.ref.posn, String.format("Cannot access members of method %s", refDecl.name));
         String className = getClassName(refDecl);
         if (className == null)
-            throw new IdentificationError(ref.ref.posn, String.format("Cannot access members of base type %s", TypeChecker.typeStr(refDecl.type)));
+            throw new MatcherError(ref.ref.posn, String.format("Cannot access members of base type %s", TypeChecker.typeStr(refDecl.type)));
         boolean isClass = refDecl instanceof ClassDecl;
         ClassDecl classDecl = arg.getClassDecl(ref.posn, className);
         boolean isActiveClass = className.equals(activeClass.name);
@@ -420,9 +420,9 @@ public class Matcher implements Visitor<IdTable, Object> {
         MemberDecl decl = arg.getClassMember(ref.id.posn, classDecl.name, ref.id.spelling);
         ref.id.decl = decl;
         if (isClass && !decl.isStatic)
-            throw new IdentificationError(ref.id.posn, String.format("Cannot non-static member %s from class %s", decl.name, className));
+            throw new MatcherError(ref.id.posn, String.format("Cannot non-static member %s from class %s", decl.name, className));
         if (decl.isPrivate && !isActiveClass)
-            throw new IdentificationError(ref.id.posn, String.format("%s.%s is private", className, decl.name));
+            throw new MatcherError(ref.id.posn, String.format("%s.%s is private", className, decl.name));
         ref.decl = decl;
         return decl;
     }

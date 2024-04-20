@@ -280,7 +280,7 @@ public class Codifier implements Visitor<Object, Object> {
         +0x08 RIP (Return Addr)
         +0x00 RBP (Last Frame RBP) <- RBP
         LOCAL VARIABLES
-        -0x16 --- <- RSP
+        -0x08 --- <- RSP
      */
 
     final int ARG_OFFSET = 0x10;

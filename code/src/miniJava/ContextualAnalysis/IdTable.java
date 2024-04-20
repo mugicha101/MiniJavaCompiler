@@ -34,9 +34,9 @@ public class IdTable {
             return declList.isEmpty();
         }
 
-        public void push(Declaration decl, int scopeLevel) throws IdentificationError {
+        public void push(Declaration decl, int scopeLevel) throws MatcherError {
             if (!scopeLevelList.isEmpty() && scopeLevelList.get(scopeLevelList.size()-1) == scopeLevel) {
-                throw new IdentificationError(decl.posn, String.format("Multiple definitions for identifier %s", decl.name));
+                throw new MatcherError(decl.posn, String.format("Multiple definitions for identifier %s", decl.name));
             }
             declList.add(decl);
             scopeLevelList.add(scopeLevel);
@@ -85,7 +85,7 @@ public class IdTable {
 
     public void addClassDecl(ClassDecl decl) {
         if (classIdTable.containsKey(decl.name))
-            throw new IdentificationError(decl.posn, String.format("Multiple definitions for class %s", decl.name));
+            throw new MatcherError(decl.posn, String.format("Multiple definitions for class %s", decl.name));
         classIdTable.put(decl.name, new MemberIdTable(decl));
         for (FieldDecl fieldDecl : decl.fieldDeclList)
             addFieldDecl(decl.name, fieldDecl);
@@ -96,58 +96,58 @@ public class IdTable {
     private void addFieldDecl(String className, FieldDecl decl) {
         HashMap<String, FieldDecl> fieldIdTable = classIdTable.get(className).fieldIdTable;
         if (fieldIdTable.containsKey(decl.name))
-            throw new IdentificationError(decl.posn, String.format("Multiple definitions for field %s.%s", className, decl.name));
+            throw new MatcherError(decl.posn, String.format("Multiple definitions for field %s.%s", className, decl.name));
         fieldIdTable.put(decl.name, decl);
     }
 
     private void addMethodDecl(String className, MethodDecl decl) {
         HashMap<String, MethodDecl> methodIdTable = classIdTable.get(className).methodIdTable;
         if (methodIdTable.containsKey(decl.name))
-            throw new IdentificationError(decl.posn, String.format("Multiple definitions for method %s.%s", className, decl.name));
+            throw new MatcherError(decl.posn, String.format("Multiple definitions for method %s.%s", className, decl.name));
         methodIdTable.put(decl.name, decl);
     }
 
     public Declaration getScopedDecl(SourcePosition posn, String name) {
         if (!idTable.containsKey(name))
-            throw new IdentificationError(posn, String.format("Undeclared identifier %s", name));
+            throw new MatcherError(posn, String.format("Undeclared identifier %s", name));
         DeclScopeHandler handler = idTable.get(name);
         if (handler.locked)
-            throw new IdentificationError(posn, String.format("Cannot reference variable %s within its declaration statement", name));
+            throw new MatcherError(posn, String.format("Cannot reference variable %s within its declaration statement", name));
         return handler.getLast();
     }
 
     public MemberDecl getClassMember(SourcePosition posn, String className, String memberName) {
         if (!classIdTable.containsKey(className))
-            throw new IdentificationError(posn, String.format("Undeclared class %s", className));
+            throw new MatcherError(posn, String.format("Undeclared class %s", className));
         MemberIdTable memberIdTable = classIdTable.get(className);
         if (memberIdTable.fieldIdTable.containsKey(memberName))
             return memberIdTable.fieldIdTable.get(memberName);
         if (memberIdTable.methodIdTable.containsKey(memberName))
             return memberIdTable.methodIdTable.get(memberName);
-        throw new IdentificationError(posn, String.format("Undeclared member %s.%s", className, memberName));
+        throw new MatcherError(posn, String.format("Undeclared member %s.%s", className, memberName));
     }
 
     public ClassDecl getClassDecl(SourcePosition posn, String className) {
         if (!classIdTable.containsKey(className))
-            throw new IdentificationError(posn, String.format("Undeclared class %s", className));
+            throw new MatcherError(posn, String.format("Undeclared class %s", className));
         return classIdTable.get(className).classDecl;
     }
 
     public FieldDecl getFieldDecl(SourcePosition posn, String className, String fieldName) {
         if (!classIdTable.containsKey(className))
-            throw new IdentificationError(posn, String.format("Undeclared class %s", className));
+            throw new MatcherError(posn, String.format("Undeclared class %s", className));
         MemberIdTable memberIdTable = classIdTable.get(className);
         if (!memberIdTable.fieldIdTable.containsKey(fieldName))
-            throw new IdentificationError(posn, String.format("Undeclared field %s.%s", className, fieldName));
+            throw new MatcherError(posn, String.format("Undeclared field %s.%s", className, fieldName));
         return memberIdTable.fieldIdTable.get(fieldName);
     }
 
     public MethodDecl getMethodDecl(SourcePosition posn, String className, String methodName) {
         if (!classIdTable.containsKey(className))
-            throw new IdentificationError(posn, String.format("Undeclared class %s", className));
+            throw new MatcherError(posn, String.format("Undeclared class %s", className));
         MemberIdTable memberIdTable = classIdTable.get(className);
         if (!memberIdTable.methodIdTable.containsKey(methodName))
-            throw new IdentificationError(posn, String.format("Undeclared method %s.%s", className, methodName));
+            throw new MatcherError(posn, String.format("Undeclared method %s.%s", className, methodName));
         return memberIdTable.methodIdTable.get(methodName);
     }
 
