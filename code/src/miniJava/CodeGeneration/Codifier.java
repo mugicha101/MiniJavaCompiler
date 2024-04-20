@@ -577,7 +577,7 @@ public class Codifier implements Visitor<Object, Object> {
                 instr(new Imul(Reg64.RAX, new ModRMSIB(Reg64.RCX, true)));
                 break;
             case Divide:
-                instr(new Xor(new ModRMSIB(Reg64.RDX, Reg64.RDX)));
+                instr(new CustomInstruction(new byte[]{(byte)0x48, (byte)0x99}, new byte[]{})); // sign extend RAX to RDX:RAX
                 instr(new Idiv(new ModRMSIB(Reg64.RCX, true)));
                 break;
             case LogAnd:
@@ -645,7 +645,7 @@ public class Codifier implements Visitor<Object, Object> {
     @Override
     public Object visitLiteralExpr(LiteralExpr expr, Object arg) {
         expr.asmOffset = asm.getSize();
-        int val = (Integer)expr.lit.visit(this, arg);
+        long val = (Long)expr.lit.visit(this, arg);
         instr(new Mov_rmi(new ModRMSIB(Reg64.RAX, true), val));
         instr(new Push(Reg64.RAX));
         return null;
@@ -762,7 +762,7 @@ public class Codifier implements Visitor<Object, Object> {
     @Override
     public Object visitIntLiteral(IntLiteral num, Object arg) {
         num.asmOffset = asm.getSize();
-        return Integer.valueOf(num.spelling);
+        return Long.valueOf(num.spelling);
     }
 
     @Override

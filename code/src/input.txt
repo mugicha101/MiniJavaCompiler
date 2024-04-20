@@ -8,6 +8,8 @@ class MainClass {
         NumPrint.printx(b);
         int[] arr = new int[4];
         NumPrint.printd(arr.length);
+        NumPrint.printd(10/2);
+        NumPrint.printd(-10/2);
     }
 }
 class NumPrint {
