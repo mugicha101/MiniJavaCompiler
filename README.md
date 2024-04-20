@@ -70,7 +70,7 @@ X? - Optional
 `/* multiline */`
 #### Prepackaged Members
 `System.out.println(x);` allows you to print the ascii value `x` (`x` is an int)
-`array.length` allows you to get and set the length of array objects (is an int)
+`array.length` allows you to get the length of array objects (is an int, cannot be assigned to)
 ### Directory Structure
 Note: certain files omitted for brevity\
 `project` - root directory

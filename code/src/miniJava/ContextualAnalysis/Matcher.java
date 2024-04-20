@@ -219,6 +219,9 @@ public class Matcher implements Visitor<IdTable, Object> {
         Declaration refDecl = (Declaration)stmt.ref.visit(this, arg);
         checkIsTyped(refDecl.posn, refDecl);
         checkTypeMatch("assign statement", stmt.posn, exprType, refDecl.type);
+        if (refDecl.specialTag != null && refDecl.specialTag.equals("array.length")) {
+            throw new MatcherError(stmt.posn, "Array length cannot be assigned to");
+        }
         return null;
     }
 

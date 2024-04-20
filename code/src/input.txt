@@ -8,8 +8,6 @@ class MainClass {
         NumPrint.printx(b);
         int[] arr = new int[4];
         NumPrint.printd(arr.length);
-        arr.length = 5;
-        NumPrint.printd(arr.length);
     }
 }
 class NumPrint {
