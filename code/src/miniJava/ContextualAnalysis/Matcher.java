@@ -19,6 +19,11 @@ public class Matcher implements Visitor<IdTable, Object> {
     static final TypeDenoter NULL_TYPE = new ClassType(new Identifier(new Token(TokenType.NullLiteral, "null", -1, -1)), null);
     static final TypeDenoter VOID_TYPE = new ClassType(new Identifier(new Token(TokenType.VoidType, "void", -1, -1)), null);
     static final SourcePosition PREDEF_POSN = new SourcePosition(-1, -1);
+    static final FieldDecl ARR_LENGTH_DECL = new FieldDecl(false, false, INT_TYPE, "length", new SourcePosition(-1, -1));
+    static {
+        ARR_LENGTH_DECL.specialTag = "array.length";
+        ARR_LENGTH_DECL.memOffset = 0;
+    }
     public ClassDecl activeClass;
     public MethodDecl activeMethod;
     public final ErrorReporter errors;
@@ -42,26 +47,33 @@ public class Matcher implements Visitor<IdTable, Object> {
     // takes in decl, returns name of class
     // if decl is class returns its name
     // if decl is object returns its class name
+    // if decl is array return <ARRAY>
     // otherwise return null
     String getClassName(Declaration decl) {
         if (decl.type == null) return decl.name;
         if (decl.type.typeKind == TypeKind.CLASS)
             return ((ClassType)decl.type).className.spelling;
+        if (decl.type.typeKind == TypeKind.ARRAY)
+            return "<ARRAY>";
         return null;
     }
 
     void addPredefined(Package prog) {
-        ClassDecl SystemDecl = new ClassDecl("System", new FieldDeclList(), new MethodDeclList(), PREDEF_POSN);
-        SystemDecl.fieldDeclList.add(new FieldDecl(false, true, new ClassType(new Identifier(new Token(TokenType.Identifier, "_PrintStream", PREDEF_POSN.line, PREDEF_POSN.offset)), PREDEF_POSN), "out", PREDEF_POSN));
-        ClassDecl PrintStreamDecl = new ClassDecl("_PrintStream", new FieldDeclList(), new MethodDeclList(), PREDEF_POSN);
-        MethodDecl.printlnMethod = new MethodDecl(new FieldDecl(false, false, new BaseType(TypeKind.VOID, PREDEF_POSN), "println", PREDEF_POSN), new ParameterDeclList(), new StatementList(), PREDEF_POSN);
-        PrintStreamDecl.methodDeclList.add(MethodDecl.printlnMethod);
-        PrintStreamDecl.methodDeclList.get(0).parameterDeclList.add(new ParameterDecl(new BaseType(TypeKind.INT, PREDEF_POSN), "n", PREDEF_POSN));
-        ClassDecl StringDecl = new ClassDecl("String", new FieldDeclList(), new MethodDeclList(), PREDEF_POSN);
-        StringDecl.unsupported = true;
-        prog.classDeclList.add(SystemDecl);
-        prog.classDeclList.add(PrintStreamDecl);
-        prog.classDeclList.add(StringDecl);
+        // System.out.println
+        {
+            ClassDecl SystemDecl = new ClassDecl("System", new FieldDeclList(), new MethodDeclList(), PREDEF_POSN);
+            SystemDecl.fieldDeclList.add(new FieldDecl(false, true, new ClassType(new Identifier(new Token(TokenType.Identifier, "_PrintStream", PREDEF_POSN.line, PREDEF_POSN.offset)), PREDEF_POSN), "out", PREDEF_POSN));
+            ClassDecl PrintStreamDecl = new ClassDecl("_PrintStream", new FieldDeclList(), new MethodDeclList(), PREDEF_POSN);
+            MethodDecl printlnMethod = new MethodDecl(new FieldDecl(false, false, new BaseType(TypeKind.VOID, PREDEF_POSN), "println", PREDEF_POSN), new ParameterDeclList(), new StatementList(), PREDEF_POSN);
+            printlnMethod.specialTag = "System.out.println";
+            PrintStreamDecl.methodDeclList.add(printlnMethod);
+            PrintStreamDecl.methodDeclList.get(0).parameterDeclList.add(new ParameterDecl(new BaseType(TypeKind.INT, PREDEF_POSN), "n", PREDEF_POSN));
+            ClassDecl StringDecl = new ClassDecl("String", new FieldDeclList(), new MethodDeclList(), PREDEF_POSN);
+            StringDecl.unsupported = true;
+            prog.classDeclList.add(SystemDecl);
+            prog.classDeclList.add(PrintStreamDecl);
+            prog.classDeclList.add(StringDecl);
+        }
     }
 
     public void match(AST ast) {
@@ -412,6 +424,14 @@ public class Matcher implements Visitor<IdTable, Object> {
         String className = getClassName(refDecl);
         if (className == null)
             throw new MatcherError(ref.ref.posn, String.format("Cannot access members of base type %s", TypeChecker.typeStr(refDecl.type)));
+        else if (className.equals("<ARRAY>")) {
+            // handle array.length
+            if (!ref.id.spelling.equals("length"))
+                throw new MatcherError(ref.id.posn, String.format("Array object has no member %s", ref.id.spelling));
+            ref.id.decl = ARR_LENGTH_DECL;
+            ref.decl = ARR_LENGTH_DECL;
+            return ARR_LENGTH_DECL;
+        }
         boolean isClass = refDecl instanceof ClassDecl;
         ClassDecl classDecl = arg.getClassDecl(ref.posn, className);
         boolean isActiveClass = className.equals(activeClass.name);

@@ -350,12 +350,14 @@ public class Codifier implements Visitor<Object, Object> {
         blockScopeStackSizes.push(0);
 
         // BODY
-        if (md == MethodDecl.printlnMethod) {
-            // special println segment
-            int memOffset = (int)md.parameterDeclList.get(0).memOffset;
-            instr(new Lea(new ModRMSIB(Reg64.RBP, memOffset, Reg64.RSI)));
-            instr(new Mov_rmi(new ModRMSIB(Reg64.RDX, true), 1));
-            addPrintln();
+        if (md.specialTag != null) {
+            // handle predefined methods
+            if (md.specialTag.equals("System.out.println")) {
+                    int memOffset = (int)md.parameterDeclList.get(0).memOffset;
+                    instr(new Lea(new ModRMSIB(Reg64.RBP, memOffset, Reg64.RSI)));
+                    instr(new Mov_rmi(new ModRMSIB(Reg64.RDX, true), 1));
+                    addPrintln();
+            }
         } else {
             for (Statement stmt : md.statementList) {
                 stmt.visit(this, arg);

@@ -8,7 +8,6 @@ package miniJava.AbstractSyntaxTrees;
 import miniJava.SyntacticAnalyzer.SourcePosition;
 
 public class MethodDecl extends MemberDecl {
-	public static MethodDecl printlnMethod = null;
 	public MethodDecl(MemberDecl md, ParameterDeclList pl, StatementList sl, SourcePosition posn){
     super(md,posn);
     parameterDeclList = pl;

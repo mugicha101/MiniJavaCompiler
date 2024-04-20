@@ -9,6 +9,7 @@ import miniJava.SyntacticAnalyzer.SourcePosition;
 
 public abstract class AST {
     public long asmOffset = -1;
+    public String specialTag = null;
     public AST (SourcePosition posn) {
     this.posn = posn;
     }

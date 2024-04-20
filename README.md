@@ -65,9 +65,12 @@ X? - Optional
 | Expression ::= `new` (`int` \| Id) `[` Expression `]`                                                 | NewArrayExpr      |
 | UnOp ::= `-` \| `!`                                                                                   | Operator          |
 | BinOp ::= `+` \| `-` \| `*` \| `/` \| `&&` \| `\|\|` \|                                               | Operator          |
-Comments: `// single line` and `/* multiline */`
-#### Prepackaged Classes
+#### Comments
+`// single line`\
+`/* multiline */`
+#### Prepackaged Members
 `System.out.println(x);` allows you to print the ascii value `x` (`x` is an int)
+`array.length` allows you to get and set the length of array objects (is an int)
 ### Directory Structure
 Note: certain files omitted for brevity\
 `project` - root directory
