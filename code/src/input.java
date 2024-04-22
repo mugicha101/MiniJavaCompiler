@@ -58,9 +58,8 @@ class NumPrint {
             m = m * mod;
         }
         char[] arr = new char[digs];
-        int i = 0;
         long s = 0;
-        while (i < digs) {
+        for (int i = 0; i < digs; i = i + 1) {
             m = m / mod;
             arr[i] = (char)(x / m - s);
             if (arr[i] >= 10) {
@@ -69,7 +68,6 @@ class NumPrint {
                 System.out.println(arr[i]+'0');
             }
             s = s + arr[i];
-            i = i + 1;
             s = s * mod;
         }
         System.out.println('\n');

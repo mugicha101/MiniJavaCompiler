@@ -557,7 +557,7 @@ public class Codifier implements Visitor<Object, Object> {
 
         // push scope and init
         blockScopeStackSizes.push(0);
-        stmt.init.visit(this, arg);
+        if (stmt.init != null) stmt.init.visit(this, arg);
 
         // initial jump
         String condJmpLabel = "condJmpLabel " + genNonce();
@@ -566,14 +566,18 @@ public class Codifier implements Visitor<Object, Object> {
         // body, incr
         int loopTopAddress = asm.getSize();
         stmt.body.visit(this, arg);
-        stmt.incr.visit(this, arg);
+        if (stmt.incr != null) stmt.incr.visit(this, arg);
 
         // condition
         addLabel(condJmpLabel);
-        stmt.cond.visit(this, arg);
-        instr(new Pop(Reg64.RAX));
-        instr(new Cmp(new ModRMSIB(Reg64.RAX, true), 1)); // check if true
-        instr(new CondJmp(Condition.E, asm.getSize(), loopTopAddress, false)); // jump if true
+        if (stmt.cond != null) {
+            stmt.cond.visit(this, arg);
+            instr(new Pop(Reg64.RAX));
+            instr(new Cmp(new ModRMSIB(Reg64.RAX, true), 1)); // check if true
+            instr(new CondJmp(Condition.E, asm.getSize(), loopTopAddress, false)); // jump if true
+        } else {
+            instr(new Jmp(asm.getSize(), loopTopAddress, false)); // always jump
+        }
 
         // pop scope
         int popSize = blockScopeStackSizes.pop();

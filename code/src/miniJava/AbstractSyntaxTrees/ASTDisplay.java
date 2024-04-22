@@ -250,9 +250,9 @@ public class ASTDisplay implements Visitor<String,Object> {
     @Override
     public Object visitForStmt(ForStmt stmt, String arg) {
         show(arg, stmt);
-        stmt.init.visit(this, indent(arg));
-        stmt.cond.visit(this, indent(arg));
-        stmt.incr.visit(this, indent(arg));
+        if (stmt.init != null) stmt.init.visit(this, indent(arg));
+        if (stmt.cond != null) stmt.cond.visit(this, indent(arg));
+        if (stmt.incr != null) stmt.incr.visit(this, indent(arg));
         stmt.body.visit(this, indent(arg));
         return null;
     }

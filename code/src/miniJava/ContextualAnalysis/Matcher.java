@@ -311,10 +311,12 @@ public class Matcher implements Visitor<IdTable, Object> {
     @Override
     public Object visitForStmt(ForStmt stmt, IdTable arg) {
         arg.openScope();
-        stmt.init.visit(this, arg);
-        TypeDenoter condType = (TypeDenoter)stmt.cond.visit(this, arg);
-        checkTypeMatch("for statement condition", stmt.posn, condType, BOOLEAN_TYPE);
-        stmt.incr.visit(this, arg);
+        if (stmt.init != null) stmt.init.visit(this, arg);
+        if (stmt.cond != null) {
+            TypeDenoter condType = (TypeDenoter)stmt.cond.visit(this, arg);
+            checkTypeMatch("for statement condition", stmt.posn, condType, BOOLEAN_TYPE);
+        }
+        if (stmt.incr != null) stmt.incr.visit(this, arg);
         checkIsolatedVarDeclStmt(stmt.body);
         stmt.body.visit(this, arg);
         arg.closeScope();
