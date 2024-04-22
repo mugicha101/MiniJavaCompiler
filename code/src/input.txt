@@ -1,7 +1,30 @@
 class MainClass {
     static int a;
     static int b;
+    private static int returnCast() {
+        return 'a';
+    }
     public static void main(String[] args) {
+        MainClass foo = new MainClass();
+        NumPrint.printd(2147483647 + 2147483647);
+        if (foo == foo) {
+            NumPrint.printd(1000);
+        }
+        if (2.0 * 5.0 > (double)2.f) {
+            NumPrint.printd((int)(1234.5 + 8.0));
+        }
+        NumPrint.printd(returnCast());
+        boolean valBool = true;
+        int valInt = 1;
+        long valLong = 1l + 2l;
+        float valFloat = 1.5f;
+        valFloat = valFloat + (float)valInt;
+        double valDouble = 1d;
+        int castTest = (int)valLong;
+        NumPrint.printd(castTest);
+        NumPrint.printd((int)valFloat);
+        NumPrint.printd((int)(valDouble + 5.));
+        char valChar = 'a';
         a = 727;
         NumPrint.printd(a);
         b = 1831;
@@ -13,48 +36,48 @@ class MainClass {
     }
 }
 class NumPrint {
-    private static void print(int x, int mod) {
+    private static void print(long x, long mod) {
         if (x == 0) {
-            System.out.println(48);
+            System.out.println('0');
             return;
         }
         if (x < 0) {
             x = -x;
-            System.out.println(45);
+            System.out.println('-');
         }
         int digs = 0;
-        int t = x;
-        int m = 1;
+        long t = x;
+        long m = 1;
         while (t > 0) {
             digs = digs + 1;
             t = t / mod;
             m = m * mod;
         }
-        int[] arr = new int[digs];
+        char[] arr = new char[digs];
         int i = 0;
-        int s = 0;
+        long s = 0;
         while (i < digs) {
             m = m / mod;
-            arr[i] = x / m - s;
+            arr[i] = (char)(x / m - s);
             if (arr[i] >= 10) {
-                System.out.println(arr[i]+87);
+                System.out.println(arr[i]-(char)10+'a');
             } else {
-                System.out.println(arr[i]+48);
+                System.out.println(arr[i]+'0');
             }
             s = s + arr[i];
             i = i + 1;
             s = s * mod;
         }
-        System.out.println(10);
+        System.out.println((char)10);
     }
 
-    public static void printd(int x) {
+    public static void printd(long x) {
         print(x, 10);
     }
 
-    public static void printx(int x) {
-        System.out.println(48);
-        System.out.println(120);
+    public static void printx(long x) {
+        System.out.println('0');
+        System.out.println('x');
         print(x, 16);
     }
 }

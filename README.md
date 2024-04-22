@@ -37,8 +37,8 @@ X? - Optional
 | MethodDeclaration ::= Visibility Access (Type \| `void`) Id `(` ParameterList? `)` `{` Statement* `}` | MethodDecl        |
 | Visibility ::= (`public` \| `private`)?                                                               | n/a               |
 | Access ::= (`static`)?                                                                                | n/a               |
-| Type ::= `int` \| `boolean` \| Id \| (`int` \| Identifier)`[]`                                        | TypeDenoter       |
-| Id ::= `{letter}` (`{letter}` \| `_` \| `{number}`)*                                                  | Identifier        |
+| Type ::= (BaseType \| Id)(`[]`)?                                                                      | TypeDenoter       |
+| Id ::= `{letter}` (`{letter}` \| `_` \| `{digit}`)*                                                   | Identifier        |
 | ParameterList ::= Type Id (`,` Type Id)*                                                              | ParameterDeclList |
 | ArgumentList ::= Expression (`,` Expression)*                                                         | ExprList          |
 | Reference ::= `id`                                                                                    | IdRef             |
@@ -54,15 +54,15 @@ X? - Optional
 | Statement ::= `while` `(` Expression `)` Statement                                                    | WhileStmt         |
 | Expression ::= Reference                                                                              | RefExpr           |
 | Expression ::= Reference `[` Expression `]`                                                           | IxExpr            |
-| Expression ::= `(` ArgumentList? `)`                                                                  | CallExpr          |
+| Expression ::= Reference `(` ArgumentList? `)`                                                        | CallExpr          |
 | Expression ::= UnOp Expression                                                                        | UnaryExpr         |
 | Expression ::= Expression BinOp Expression                                                            | BinaryExpr        |
+| Expression ::= `(` Type `)` Expression                                                                | CastExpr          |
 | Expression ::= `(` Expression `)`                                                                     | Expression        |
-| Expression ::= `{number}`                                                                             | IntLiteral        |
-| Expression ::= `true` \| `false`                                                                      | BooleanLiteral    |
-| Expression ::= `null`                                                                                 | NullLiteral       |
+| Expression ::= `{value or null or char}`                                                              | LiteralExpr       |
 | Expression ::= `new` Id `()`                                                                          | NewObjectExpr     |
-| Expression ::= `new` (`int` \| Id) `[` Expression `]`                                                 | NewArrayExpr      |
+| Expression ::= `new` (BaseType \| Id) `[` Expression `]`                                              | NewArrayExpr      |
+| BaseType ::=  `int` \| `long` \| `boolean` \| `char` \| `float` \| `double`                           | BaseType          |
 | UnOp ::= `-` \| `!`                                                                                   | Operator          |
 | BinOp ::= `+` \| `-` \| `*` \| `/` \| `&&` \| `\|\|` \|                                               | Operator          |
 #### Comments

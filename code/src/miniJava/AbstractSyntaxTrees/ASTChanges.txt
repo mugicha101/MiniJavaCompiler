@@ -1,10 +1,13 @@
-Added NullLiteral class extending Terminal
-Added visitNullLiteral in Visitor
-Implemented visitNullLiteral in ASTDisplay
-Add decl field to Identifier
-Add unsupported field to ClassDecl
-Add decl field to Reference
+add NullLiteral class extending Terminal
+add visitNullLiteral in Visitor
+implement visitNullLiteral in ASTDisplay
+add decl field to Identifier
+add unsupported field to ClassDecl
+add decl field to Reference
 add memOffset field to Declaration
 add memSize field to ClassDecl
 add parent field to MemberDecl
 add specialTag field to AST
+add FloatLiteral, DoubleLiteral, LongLiteral, CharLiteral classes extending Terminal alongside associated visitor methods
+add CastExpr class extending Expression alongside associated visitor method
+add resultType field to Expression

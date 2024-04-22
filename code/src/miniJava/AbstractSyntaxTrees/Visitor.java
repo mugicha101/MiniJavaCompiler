@@ -45,6 +45,7 @@ public interface Visitor<ArgType,ResultType> {
     public ResultType visitLiteralExpr(LiteralExpr expr, ArgType arg);
     public ResultType visitNewObjectExpr(NewObjectExpr expr, ArgType arg);
     public ResultType visitNewArrayExpr(NewArrayExpr expr, ArgType arg);
+    public ResultType visitCastExpr(CastExpr expr, ArgType arg);
     
   // References
     public ResultType visitThisRef(ThisRef ref, ArgType arg);
@@ -57,4 +58,8 @@ public interface Visitor<ArgType,ResultType> {
     public ResultType visitIntLiteral(IntLiteral num, ArgType arg);
     public ResultType visitBooleanLiteral(BooleanLiteral bool, ArgType arg);
     public ResultType visitNullLiteral(NullLiteral nullLiteral, ArgType arg);
+    public ResultType visitLongLiteral(LongLiteral longLiteral, ArgType arg);
+    public ResultType visitFloatLiteral(FloatLiteral floatLiteral, ArgType arg);
+    public ResultType visitDoubleLiteral(DoubleLiteral doubleLiteral, ArgType arg);
+    public ResultType visitCharLiteral(CharLiteral charLiteral, ArgType arg);
 }

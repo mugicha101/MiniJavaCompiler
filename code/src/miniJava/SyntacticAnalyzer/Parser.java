@@ -210,21 +210,42 @@ public class Parser {
 		return classDecl;
 	}
 
-	// Type ::= int | boolean | id | (int|id)[]
+	// Type ::= (int | boolean | ... | id)([])?
 	private TypeDenoter parseOptionalType() {
+		// get type
 		SourcePosition typePosition = currToken.getTokenPosition();
-		if (currTokenMatches(TokenType.BooleanType)) {
-			TypeDenoter typeDenoter =  new BaseType(TypeKind.BOOLEAN, typePosition);
-			nextToken();
-			return typeDenoter;
+		TypeKind type = null;
+		switch (currToken.getTokenType()) {
+			case BooleanType:
+				type = TypeKind.BOOLEAN;
+				break;
+			case IntType:
+				type = TypeKind.INT;
+				break;
+			case LongType:
+				type = TypeKind.LONG;
+				break;
+			case FloatType:
+				type = TypeKind.FLOAT;
+				break;
+			case DoubleType:
+				type = TypeKind.DOUBLE;
+				break;
+			case CharType:
+				type = TypeKind.CHAR;
+				break;
 		}
 		TypeDenoter typeDenoter;
-		if (currTokenMatches(TokenType.IntType)) {
-			typeDenoter = new BaseType(TypeKind.INT, currToken.getTokenPosition());
+		if (type != null) {
+			// base type
+			typeDenoter = new BaseType(type, typePosition);
 		} else if (currTokenMatches(TokenType.Identifier)) {
-			typeDenoter =  new ClassType(new Identifier(currToken), typePosition);
-		} else return null;
+			// class type
+			typeDenoter = new ClassType(new Identifier(currToken), typePosition);
+		} else return null; // unknown type
 		nextToken();
+
+		// handle array types
 		if (optionalAccept(TokenType.LBracket)) {
 			typeDenoter = new ArrayType(typeDenoter, typePosition);
 			accept(TokenType.RBracket);
@@ -495,13 +516,42 @@ public class Parser {
 			}
 			return new UnaryExpr(new Operator(startToken), nestedExpr, exprPos);
 		} else if (optionalAccept(TokenType.LParen)) {
-			// ( expr )
-			Expression expr = parseExpression();
-			accept(TokenType.RParen);
-			return expr;
+			Expression expr = parseOptionalExpression();
+			if (expr != null) {
+				// ( type ) expr | ( expr ) needs to be resolved outside
+				// for now assume ( expr )
+				accept(TokenType.RParen);
+				return expr;
+			} else {
+				// ( type ) expr
+				TypeDenoter type = parseType();
+				accept(TokenType.RParen);
+				expr = parseExpressionTerm();
+				return new CastExpr(type, expr, exprPos);
+			}
 		} else if (parseOptionalNum()) {
 			// num
-			return new LiteralExpr(new IntLiteral(startToken), exprPos);
+			Terminal terminal;
+			switch (startToken.getTokenType()) {
+				case IntLiteral:
+					terminal = new IntLiteral(startToken);
+					break;
+				case LongLiteral:
+					terminal = new LongLiteral(startToken);
+					break;
+				case FloatLiteral:
+					terminal = new FloatLiteral(startToken);
+					break;
+				case DoubleLiteral:
+					terminal = new DoubleLiteral(startToken);
+					break;
+				case CharLiteral:
+					terminal = new CharLiteral(startToken);
+					break;
+				default:
+					throw new RuntimeException(String.format("unknown num type %s", startToken.getTokenType()));
+			}
+			return new LiteralExpr(terminal, exprPos);
 		} else if (optionalAccept(TokenType.BooleanLiteral)) {
 			// true | false
 			return new LiteralExpr(new BooleanLiteral(startToken), exprPos);
@@ -527,21 +577,47 @@ public class Parser {
 					errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected ( or [ after new identifier, but got %s", currToken.getTokenText()));
 					throw new SyntaxError();
 				}
-			} else if (currTokenMatches(TokenType.IntType)) {
-				// int [ expr ]
-				BaseType type = new BaseType(TypeKind.INT, currToken.getTokenPosition());
+			} else {
+				// num [ expr ]
+				TypeKind typeKind = null;
+				switch (currToken.getTokenType()) {
+					case CharType:
+						typeKind = TypeKind.CHAR;
+						break;
+					case IntType:
+						typeKind = TypeKind.INT;
+						break;
+					case LongType:
+						typeKind = TypeKind.LONG;
+						break;
+					case FloatType:
+						typeKind = TypeKind.FLOAT;
+						break;
+					case DoubleType:
+						typeKind = TypeKind.DOUBLE;
+						break;
+					default:
+						errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected type after new, but got %s", currToken.getTokenText()));
+						throw new SyntaxError();
+				}
+				BaseType type = new BaseType(typeKind, currToken.getTokenPosition());
 				nextToken();
 				accept(TokenType.LBracket);
 				Expression sizeExpr = parseExpression();
 				accept(TokenType.RBracket);
 				return new NewArrayExpr(type, sizeExpr, exprPos);
-			} else {
-				errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected [ after new int, but got %s", currToken.getTokenText()));
-				throw new SyntaxError();
 			}
 		}
 		return null;
 	}
+
+	private Expression parseExpressionTerm() throws SyntaxError {
+		Expression expr = parseOptionalExpressionTerm();
+		if (expr != null) return expr;
+		errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected start of expression term, but got %s", currToken.getTokenText()));
+		throw new SyntaxError();
+	}
+
 	private Expression parseOptionalExpression() throws SyntaxError {
 		// doubly linked list of single term expressions
 		class Term {
@@ -565,10 +641,25 @@ public class Parser {
 				errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected start of an expression following a binary operator, but got %s", currToken.getTokenText()));
 				throw new SyntaxError();
 			}
-			termChain.add(new Term(term, termChain.size() - 1, termChain.size() + 1));
 			Operator operator = parseOptionalBinOp();
-			if (operator == null) chainHasNext = false;
+			if (operator == null) {
+				Expression castExpr;
+				if (
+						term instanceof RefExpr
+						&& ((RefExpr)term).ref instanceof IdRef
+						&& (castExpr = parseOptionalExpressionTerm()) != null
+				) {
+					// retroactively try to change ( expr ) to ( type ) exprTerm
+					Identifier id = ((IdRef)((RefExpr)term).ref).id;
+					term = new CastExpr(new ClassType(id, id.posn), castExpr, term.posn);
+					operator = parseOptionalBinOp();
+					chainHasNext = operator != null;
+				} else {
+					chainHasNext = false;
+				}
+			}
 			else binOps.add(operator);
+			termChain.add(new Term(term, termChain.size() - 1, termChain.size() + 1));
 		}
 
 		// apply operator precedence of expr (binop expr)* chain
@@ -646,7 +737,7 @@ public class Parser {
 	}
 
 	private boolean parseOptionalNum() {
-		TokenType[] numTokens = { TokenType.ByteLiteral, TokenType.IntLiteral, TokenType.FloatLiteral, TokenType.DoubleLiteral };
+		TokenType[] numTokens = { TokenType.ByteLiteral, TokenType.IntLiteral, TokenType.LongLiteral, TokenType.FloatLiteral, TokenType.DoubleLiteral, TokenType.CharLiteral };
 		for (TokenType token : numTokens) {
 			if (optionalAccept(token)) return true;
 		}

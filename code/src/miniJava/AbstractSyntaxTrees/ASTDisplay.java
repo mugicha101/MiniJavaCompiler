@@ -312,6 +312,14 @@ public class ASTDisplay implements Visitor<String,Object> {
         expr.classtype.visit(this, indent(arg));
         return null;
     }
+
+    @Override
+    public Object visitCastExpr(CastExpr expr, String arg) {
+        show(arg, expr);
+        expr.type.visit(this, indent(arg));
+        expr.expr.visit(this, indent(arg));
+        return null;
+    }
     
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -367,6 +375,30 @@ public class ASTDisplay implements Visitor<String,Object> {
 
     public Object visitNullLiteral(NullLiteral nil, String arg){
         show(arg, quote(nil.spelling) + " " + nil.toString());
+        return null;
+    }
+
+    @Override
+    public Object visitLongLiteral(LongLiteral longLiteral, String arg) {
+        show(arg, quote(longLiteral.spelling) + " " + longLiteral.toString());
+        return null;
+    }
+
+    @Override
+    public Object visitFloatLiteral(FloatLiteral floatLiteral, String arg) {
+        show(arg, quote(floatLiteral.spelling) + " " + floatLiteral.toString());
+        return null;
+    }
+
+    @Override
+    public Object visitDoubleLiteral(DoubleLiteral doubleLiteral, String arg) {
+        show(arg, quote(doubleLiteral.spelling) + " " + doubleLiteral.toString());
+        return null;
+    }
+
+    @Override
+    public Object visitCharLiteral(CharLiteral charLiteral, String arg) {
+        show(arg, quote(charLiteral.spelling) + " " + charLiteral.toString());
         return null;
     }
 }

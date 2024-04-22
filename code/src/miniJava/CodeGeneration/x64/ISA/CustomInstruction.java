@@ -4,6 +4,10 @@ import miniJava.CodeGeneration.x64.Instruction;
 import miniJava.CodeGeneration.x64.x64;
 
 public class CustomInstruction extends Instruction {
+    public CustomInstruction(byte[] bytes) {
+        x64.writeBytes(this.opcodeBytes, bytes);
+    }
+
     public CustomInstruction(byte[] opcodeBytes, byte[] immBytes) {
         x64.writeBytes(this.opcodeBytes, opcodeBytes);
         x64.writeBytes(this.immBytes, immBytes);

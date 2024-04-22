@@ -10,16 +10,20 @@ import miniJava.SyntacticAnalyzer.SourcePosition;
 import miniJava.SyntacticAnalyzer.Token;
 import miniJava.SyntacticAnalyzer.TokenType;
 
+import java.nio.ByteBuffer;
 import java.util.*;
 
 public class Codifier implements Visitor<Object, Object> {
     private static class UnresolvedAddress {
-        public static Map<String,Integer> labelMap = new HashMap<>();
+        public static Map<String, Integer> labelMap = new HashMap<>();
+
         enum Type {CALL, JMP, COND_JMP}
+
         private final InstructionList asm;
         private final Type type;
         private final Instruction instr;
         private final Object target;
+
         public UnresolvedAddress(InstructionList asm, int asmIdx, Object target) {
             this.asm = asm;
             this.instr = asm.get(asmIdx);
@@ -34,26 +38,27 @@ public class Codifier implements Visitor<Object, Object> {
                 throw new IllegalArgumentException("unsupported target type for unresolved address (must be MethodDecl or String)");
             this.target = target;
         }
+
         public void resolve() {
             Instruction newInstr;
             int targetOffset;
             if (target instanceof MethodDecl) {
-                targetOffset = (int)((MethodDecl)target).asmOffset;
+                targetOffset = (int) ((MethodDecl) target).asmOffset;
             } else {
-                String label = (String)target;
+                String label = (String) target;
                 if (!labelMap.containsKey(label))
                     throw new CodeGenerationError(String.format("Error when resolving address: Cannot find address with label %s", label));
                 targetOffset = labelMap.get(label);
             }
             switch (type) {
                 case JMP:
-                    newInstr = new Jmp((int)instr.startAddress, targetOffset, false);
+                    newInstr = new Jmp((int) instr.startAddress, targetOffset, false);
                     break;
                 case COND_JMP:
-                    newInstr = new CondJmp(((CondJmp)instr).cond, (int)instr.startAddress, targetOffset, false);
+                    newInstr = new CondJmp(((CondJmp) instr).cond, (int) instr.startAddress, targetOffset, false);
                     break;
                 case CALL:
-                    newInstr = new Call((int)instr.startAddress, targetOffset);
+                    newInstr = new Call((int) instr.startAddress, targetOffset);
                     break;
                 default:
                     throw new IllegalArgumentException("unknown unresolved instruction type");
@@ -61,22 +66,29 @@ public class Codifier implements Visitor<Object, Object> {
             asm.patch(instr.listIdx, newInstr);
         }
     }
+
     private final ErrorReporter errors;
     private InstructionList asm;
     private MethodDecl mainMethod;
     private List<UnresolvedAddress> unresolvedAddressList;
     private Stack<Integer> blockScopeStackSizes;
+    private FPUHandler fpu;
+    private ALUHandler alu;
     private int rbpOffset;
+
     public Codifier(ErrorReporter errors) {
         this.errors = errors;
     }
+
     private int thisMemOffset;
     private ClassDecl currentClass;
     private MethodDecl currentMethod;
     private long nextNonce;
+
     private void addUnresolved(int idx, Object target) {
         unresolvedAddressList.add(new UnresolvedAddress(asm, idx, target));
     }
+
     public void parse(Package prog) {
         try {
             // If you haven't refactored the name "ModRMSIB" to something like "R",
@@ -163,14 +175,16 @@ public class Codifier implements Visitor<Object, Object> {
             blockScopeStackSizes = new Stack<>();
             UnresolvedAddress.labelMap.clear();
             nextNonce = 0;
+            fpu = new FPUHandler(asm);
+            alu = new ALUHandler(asm, fpu);
 
             // store stack base address at text segment base (used for accessing static vars at the bottom of the stack)
             // add 8 bytes of padding (where the stack base is stored, entry point is after this padding)
-            instr(new CustomInstruction(new byte[] {}, (long)0));
+            instr(new CustomInstruction(new byte[]{}, (long) 0));
             // store stack base instruction: mov [rip-8],rsp
             instr(new CustomInstruction(
-                    new byte[] {(byte)0x48, (byte)0x89, (byte)0x25},
-                    new byte[] {(byte)0xf8, (byte)0xff, (byte)0xff, (byte)0xff}
+                    new byte[]{(byte) 0x48, (byte) 0x89, (byte) 0x25},
+                    new byte[]{(byte) 0xf8, (byte) 0xff, (byte) 0xff, (byte) 0xff}
             ));
 
             // resolve fields (add statics below main stackframe)
@@ -181,8 +195,8 @@ public class Codifier implements Visitor<Object, Object> {
                 long classMemOffset = 0;
                 for (FieldDecl fieldDecl : classDecl.fieldDeclList) {
                     if (fieldDecl.isStatic) {
-                        fieldDecl.memOffset = stackBase;
                         stackBase -= 8;
+                        fieldDecl.memOffset = stackBase;
                         instr(new Push(Reg64.RAX));
                     } else {
                         fieldDecl.memOffset = classMemOffset;
@@ -198,7 +212,7 @@ public class Codifier implements Visitor<Object, Object> {
             loadStackBase(Reg64.RAX);
             instr(new Mov_rrm(new ModRMSIB(Reg64.RAX, -8, Reg64.RAX)));
             instr(new Push(Reg64.RAX));
-            addUnresolved(instr(new Call(0,0)), mainMethod);
+            addUnresolved(instr(new Call(0, 0)), mainMethod);
 
             // exit
             addExit();
@@ -214,7 +228,7 @@ public class Codifier implements Visitor<Object, Object> {
             // Output the file "a.out" if no errors
             if (!errors.hasErrors())
                 makeElf("a.out");
-        } catch(CodeGenerationError e) {
+        } catch (CodeGenerationError e) {
             errors.reportError(e.getMessage());
         }
     }
@@ -225,8 +239,8 @@ public class Codifier implements Visitor<Object, Object> {
         offset = (offset ^ 0xffffffffL) + 1;
         // mov rax,[rip-<asm.getSize()>]
         instr(new CustomInstruction(
-                new byte[] {(byte)(reg.getIdx() < 8 ? 0x48 : 0x4c), (byte)0x8b, (byte)(0x05 + ((reg.getIdx() & 0b111) << 3))},
-                new byte[] {(byte)offset, (byte)(offset >> 8), (byte)(offset >> 16), (byte)(offset >> 24)}
+                new byte[]{(byte) (reg.getIdx() < 8 ? 0x48 : 0x4c), (byte) 0x8b, (byte) (0x05 + ((reg.getIdx() & 0b111) << 3))},
+                new byte[]{(byte) offset, (byte) (offset >> 8), (byte) (offset >> 16), (byte) (offset >> 24)}
         ));
     }
 
@@ -244,15 +258,15 @@ public class Codifier implements Visitor<Object, Object> {
     }
 
     private void addMalloc() {
-        instr( new Mov_rmi(new ModRMSIB(Reg64.RAX,true),0x09) ); // mmap
+        instr(new Mov_rmi(new ModRMSIB(Reg64.RAX, true), 0x09)); // mmap
 
-        instr(new Xor(		new ModRMSIB(Reg64.RDI,Reg64.RDI)) 	); // addr=0
-        instr(new Mov_rmi(	new ModRMSIB(Reg64.RSI,true),0x1000) ); // 4kb alloc
-        instr(new Mov_rmi(	new ModRMSIB(Reg64.RDX,true),0x03) 	); // prot read|write
-        instr(new Mov_rmi(	new ModRMSIB(Reg64.R10,true),0x22) 	); // flags= private, anonymous
-        instr(new Mov_rmi(	new ModRMSIB(Reg64.R8, true),-1) 	); // fd= -1
-        instr(new Xor(		new ModRMSIB(Reg64.R9,Reg64.R9)) 	); // offset=0
-        instr(new Syscall() );
+        instr(new Xor(new ModRMSIB(Reg64.RDI, Reg64.RDI))); // addr=0
+        instr(new Mov_rmi(new ModRMSIB(Reg64.RSI, true), 0x1000)); // 4kb alloc
+        instr(new Mov_rmi(new ModRMSIB(Reg64.RDX, true), 0x03)); // prot read|write
+        instr(new Mov_rmi(new ModRMSIB(Reg64.R10, true), 0x22)); // flags= private, anonymous
+        instr(new Mov_rmi(new ModRMSIB(Reg64.R8, true), -1)); // fd= -1
+        instr(new Xor(new ModRMSIB(Reg64.R9, Reg64.R9))); // offset=0
+        instr(new Syscall());
 
         // pointer to newly allocated memory is in RAX
     }
@@ -325,7 +339,7 @@ public class Codifier implements Visitor<Object, Object> {
     public Object visitMethodDecl(MethodDecl md, Object arg) {
         currentMethod = md;
         md.asmOffset = asm.getSize();
-        System.out.printf("method %s.%s address: 0x%x\n", md.parent.name, md.name, md.asmOffset+0x1b0);
+        System.out.printf("method %s.%s address: 0x%x\n", md.parent.name, md.name, md.asmOffset + 0x1b0);
 
         // PROLOGUE
         // update rbp and rsp
@@ -353,10 +367,10 @@ public class Codifier implements Visitor<Object, Object> {
         if (md.specialTag != null) {
             // handle predefined methods
             if (md.specialTag.equals("System.out.println")) {
-                    int memOffset = (int)md.parameterDeclList.get(0).memOffset;
-                    instr(new Lea(new ModRMSIB(Reg64.RBP, memOffset, Reg64.RSI)));
-                    instr(new Mov_rmi(new ModRMSIB(Reg64.RDX, true), 1));
-                    addPrintln();
+                int memOffset = (int) md.parameterDeclList.get(0).memOffset;
+                instr(new Lea(new ModRMSIB(Reg64.RBP, memOffset, Reg64.RSI)));
+                instr(new Mov_rmi(new ModRMSIB(Reg64.RDX, true), 1));
+                addPrintln();
             }
         } else {
             for (Statement stmt : md.statementList) {
@@ -542,11 +556,10 @@ public class Codifier implements Visitor<Object, Object> {
         expr.asmOffset = asm.getSize();
         expr.expr.visit(this, arg);
         instr(new Pop(Reg64.RAX));
+        TypeKind type = expr.resultType == null ? null : expr.resultType.typeKind;
         switch (expr.operator.kind) {
             case Minus:
-                instr(new Xor(new ModRMSIB(Reg64.RCX, Reg64.RCX)));
-                instr(new Sub(new ModRMSIB(Reg64.RCX, Reg64.RAX)));
-                instr(new Mov_rmr(new ModRMSIB(Reg64.RAX, Reg64.RCX)));
+                alu.neg(type);
                 break;
             case LogNot:
                 instr(new Xor(new ModRMSIB(Reg64.RAX, true), 1));
@@ -566,25 +579,26 @@ public class Codifier implements Visitor<Object, Object> {
         instr(new Pop(Reg64.RCX));
         instr(new Pop(Reg64.RAX));
         Condition cond = null;
+        TypeKind type = expr.left.resultType == null ? null : expr.left.resultType.typeKind;
         switch (expr.operator.kind) {
             case Add:
-                instr(new Add(new ModRMSIB(Reg64.RAX, Reg64.RCX)));
+                alu.add(type);
                 break;
             case Minus:
-                instr(new Sub(new ModRMSIB(Reg64.RAX, Reg64.RCX)));
+                alu.sub(type);
                 break;
             case Multiply:
-                instr(new Imul(Reg64.RAX, new ModRMSIB(Reg64.RCX, true)));
+                alu.mul(type);
                 break;
             case Divide:
-                instr(new CustomInstruction(new byte[]{(byte)0x48, (byte)0x99}, new byte[]{})); // sign extend RAX to RDX:RAX
-                instr(new Idiv(new ModRMSIB(Reg64.RCX, true)));
+                alu.div(type);
                 break;
             case LogAnd:
                 instr(new And(new ModRMSIB(Reg64.RAX, Reg64.RCX)));
                 break;
             case LogOr:
                 instr(new Or(new ModRMSIB(Reg64.RAX, Reg64.RCX)));
+                break;
             case RelEq:
                 cond = Condition.E;
                 break;
@@ -607,9 +621,7 @@ public class Codifier implements Visitor<Object, Object> {
                 throw new CodeGenerationError(String.format("binary operator %s not supported\n", expr.operator.spelling));
         }
         if (cond != null) {
-            instr(new Cmp(new ModRMSIB(Reg64.RAX, Reg64.RCX)));
-            instr(new SetCond(cond, Reg8.AL));
-            instr(new And(new ModRMSIB(Reg64.RAX, true), 0x1));
+            alu.cmp(type, cond);
         }
         instr(new Push(Reg64.RAX));
         return null;
@@ -646,7 +658,7 @@ public class Codifier implements Visitor<Object, Object> {
     public Object visitLiteralExpr(LiteralExpr expr, Object arg) {
         expr.asmOffset = asm.getSize();
         long val = (Long)expr.lit.visit(this, arg);
-        instr(new Mov_rmi(new ModRMSIB(Reg64.RAX, true), val));
+        instr(new Mov_ri64(Reg64.RAX, val));
         instr(new Push(Reg64.RAX));
         return null;
     }
@@ -677,6 +689,90 @@ public class Codifier implements Visitor<Object, Object> {
         instr(new ClearDirFlag());
         instr(new Rep());
 
+        return null;
+    }
+
+    @Override
+    public Object visitCastExpr(CastExpr expr, Object arg) {
+        expr.asmOffset = asm.getSize();
+        expr.expr.visit(this, arg);
+        instr(new Pop(Reg64.RAX));
+
+        // perform cast on value in RAX
+        // TODO: handle class casts when implemented
+        int intSizeDst = 0;
+        int intSizeSrc = 0;
+        boolean isDbl = false;
+        TypeKind srcType = expr.expr.resultType.typeKind;
+        TypeKind dstType = expr.type.typeKind;
+        if (srcType != dstType) {
+            switch (dstType) {
+                case LONG:
+                    intSizeDst = 8;
+                case INT:
+                    intSizeDst = Math.max(intSizeDst, 4);
+                case CHAR:
+                    intSizeDst = Math.max(intSizeDst, 1);
+                    switch (srcType) {
+                        case DOUBLE:
+                            isDbl = true;
+                        case FLOAT:
+                            // cast float/double to long
+                            fpu.clear();
+                            fpu.setDblPrecision(isDbl);
+                            fpu.load(false, false);
+                            fpu.store(true);
+                            break;
+                        case LONG:
+                            intSizeSrc = 8;
+                        case INT:
+                            intSizeSrc = Math.max(intSizeSrc, 4);
+                        case CHAR:
+                            intSizeSrc = Math.max(intSizeSrc, 1);
+                            // casting int to int
+                            if (intSizeDst < intSizeSrc) {
+                                // simply trim result down
+                                instr(new Mov_ri64(Reg64.RCX, (1L << (intSizeDst * 8)) - 1));
+                                instr(new And(new ModRMSIB(Reg64.RAX, Reg64.RCX)));
+                            } else {
+                                // sign extend
+                                if (intSizeSrc == 1 && intSizeDst > 1) {
+                                    // extend 1 to 4
+                                    // movsx eax,al
+                                    instr(new CustomInstruction(new byte[]{(byte)0x0f, (byte)0xbe, (byte)0xc0}));
+                                } if (intSizeSrc <= 4 && intSizeDst > 4) {
+                                    // extend 4 to 8
+                                    // movsxd rax,eax
+                                    instr(new CustomInstruction(new byte[]{(byte)0x48, (byte)0x63, (byte)0xc0}));
+                                }
+                            }
+                            break;
+                    }
+                    break;
+                case DOUBLE:
+                    isDbl = true;
+                case FLOAT:
+                    switch (srcType) {
+                        case CHAR: case INT: case LONG:
+                            // cast long to float/double
+                            fpu.clear();
+                            fpu.setDblPrecision(isDbl);
+                            fpu.load(true, false);
+                            fpu.store(false);
+                            break;
+                        default:
+                            // cast float/double to double/float
+                            fpu.clear();
+                            fpu.setDblPrecision(!isDbl);
+                            fpu.load(false, false);
+                            fpu.setDblPrecision(isDbl);
+                            fpu.store(false);
+                            break;
+                    }
+                    break;
+            }
+        }
+        instr(new Push(Reg64.RAX));
         return null;
     }
 
@@ -762,18 +858,43 @@ public class Codifier implements Visitor<Object, Object> {
     @Override
     public Object visitIntLiteral(IntLiteral num, Object arg) {
         num.asmOffset = asm.getSize();
-        return Long.valueOf(num.spelling);
+        return (long)Integer.parseInt(num.spelling);
     }
 
     @Override
     public Object visitBooleanLiteral(BooleanLiteral bool, Object arg) {
         bool.asmOffset = asm.getSize();
-        return bool.spelling.equals("true") ? 1 : 0;
+        return bool.spelling.equals("true") ? 1L : 0L;
     }
 
     @Override
     public Object visitNullLiteral(NullLiteral nullLiteral, Object arg) {
         nullLiteral.asmOffset = asm.getSize();
         return 0;
+    }
+
+    @Override
+    public Object visitLongLiteral(LongLiteral longLiteral, Object arg) {
+        longLiteral.asmOffset = asm.getSize();
+        return Long.valueOf(longLiteral.spelling);
+    }
+
+    @Override
+    public Object visitFloatLiteral(FloatLiteral floatLiteral, Object arg) {
+        floatLiteral.asmOffset = asm.getSize();
+        // convert String to float to IEEE 754 bytes to int to long
+        return (long)ByteBuffer.allocate(4).putFloat(Float.parseFloat(floatLiteral.spelling)).getInt(0);
+    }
+
+    @Override
+    public Object visitDoubleLiteral(DoubleLiteral doubleLiteral, Object arg) {
+        doubleLiteral.asmOffset = asm.getSize();
+        // convert String to double to IEEE 754 bytes to long
+        return ByteBuffer.allocate(8).putDouble(Double.parseDouble(doubleLiteral.spelling)).getLong(0);
+    }
+
+    @Override
+    public Object visitCharLiteral(CharLiteral charLiteral, Object arg) {
+        return (long)charLiteral.spelling.charAt(0);
     }
 }

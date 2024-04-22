@@ -20,6 +20,9 @@ public class ExprList implements Iterable<Expression>
     public Expression get(int i){
         return elist.get(i);
     }
+    public Expression set(int i, Expression expr){
+        return elist.set(i, expr);
+    }
     
     public int size() {
         return elist.size();

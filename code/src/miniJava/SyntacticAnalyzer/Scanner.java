@@ -264,10 +264,17 @@ public class Scanner {
 							} else if (currChar == '.') {
 								takeCurr();
 								tokenType = TokenType.DoubleLiteral;
-							}
-							else if (currChar == 'f' || currChar == 'F') {
+							} else if (currChar == 'd' || currChar == 'D') {
+								skipCurr();
+								tokenType = TokenType.DoubleLiteral;
+								state = State.TokenEnd;
+							} else if (currChar == 'f' || currChar == 'F') {
 								skipCurr();
 								tokenType = TokenType.FloatLiteral;
+								state = State.TokenEnd;
+							} else if (currChar == 'l' || currChar == 'L') {
+								skipCurr();
+								tokenType = TokenType.LongLiteral;
 								state = State.TokenEnd;
 							} else {
 								state = State.TokenEnd;
@@ -276,6 +283,9 @@ public class Scanner {
 						case DoubleLiteral: {
 							if (currIsDigit()) {
 								takeCurr();
+							} else if (currChar == 'd' || currChar == 'D') {
+								skipCurr();
+								state = State.TokenEnd;
 							} else if (currChar == 'f' || currChar == 'F') {
 								skipCurr();
 								tokenType = TokenType.FloatLiteral;
@@ -313,7 +323,13 @@ public class Scanner {
 				} break;
 			}
 		}
-		if (tokenType != TokenType.End && currText.length() == 0) {
+		if (tokenType == TokenType.StringLiteral || tokenType == TokenType.CharLiteral) {
+			currText = new StringBuilder(currText.toString().substring(1, currText.length()-1).replaceAll("\\n", "\n"));
+			if (tokenType == TokenType.CharLiteral && currText.length() != 1) {
+				errors.reportError(String.format("Invalid char literal '%s'", currText));
+			}
+		}
+		else if (tokenType != TokenType.End && currText.length() == 0) {
 			errors.reportError(line, offset, String.format("Invalid symbol %c", currChar));
 			tokenType = TokenType.Error;
 			currText.append(currChar);

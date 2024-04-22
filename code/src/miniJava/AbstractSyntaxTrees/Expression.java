@@ -9,6 +9,7 @@ import  miniJava.SyntacticAnalyzer.SourcePosition;
 
 public abstract class Expression extends AST {
 
+  public TypeDenoter resultType;
   public Expression(SourcePosition posn) {
     super (posn);
   }

@@ -12,5 +12,8 @@ public enum TypeKind {
         CLASS,
         ARRAY,
         UNSUPPORTED,
-        ERROR;
+        CHAR,
+        FLOAT,
+        LONG,
+        DOUBLE
 }

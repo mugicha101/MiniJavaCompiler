@@ -5,6 +5,11 @@ import miniJava.AbstractSyntaxTrees.ClassType;
 import miniJava.AbstractSyntaxTrees.TypeDenoter;
 import miniJava.AbstractSyntaxTrees.TypeKind;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
 public class TypeChecker {
     private TypeChecker() {}
     public static String typeStr(TypeDenoter type) {
@@ -12,6 +17,14 @@ public class TypeChecker {
         switch (type.typeKind) {
             case INT:
                 return "int";
+            case LONG:
+                return "long";
+            case FLOAT:
+                return "float";
+            case DOUBLE:
+                return "double";
+            case CHAR:
+                return "char";
             case BOOLEAN:
                 return "boolean";
             case CLASS:
@@ -34,13 +47,49 @@ public class TypeChecker {
             if (
                     isClass && td.typeKind == TypeKind.CLASS
                             && (
-                            ((ClassType)actual).className.spelling.equals("null")
-                                    || ((ClassType)td).className.spelling.equals("null")
+                            ((ClassType) actual).className.spelling.equals("null")
+                                    || ((ClassType) td).className.spelling.equals("null")
                     )
             ) return true;
             String tsExp = typeStr(td);
             if (tsAct.equals(tsExp)) return true;
         }
+        return false;
+    }
+
+    public static boolean validCast(TypeDenoter srcType, TypeDenoter castType, boolean explicit) {
+        if (srcType == null || castType == null)
+            return false;
+
+        if (srcType instanceof ClassType) {
+            // TODO: class casting (when inheritance is supported)
+            return false;
+        }
+
+        if (castType instanceof ClassType) {
+            // TODO: wrapper class casts
+            return false;
+        }
+
+        // arrays cannot be used in casts
+        if (srcType instanceof ArrayType || castType instanceof  ArrayType) {
+            return false;
+        }
+
+        // cast base types
+        TypeKind src = srcType.typeKind;
+        TypeKind dst = castType.typeKind;
+        if (src == dst) return true;
+        if (src == TypeKind.CHAR)
+            return dst == TypeKind.INT || dst == TypeKind.LONG || (explicit && (dst == TypeKind.FLOAT || dst == TypeKind.DOUBLE));
+        if (src == TypeKind.INT)
+            return dst == TypeKind.LONG || (explicit && (dst == TypeKind.FLOAT || dst == TypeKind.DOUBLE || dst == TypeKind.CHAR));
+        if (src == TypeKind.LONG)
+            return explicit && (dst == TypeKind.INT || dst == TypeKind.FLOAT || dst == TypeKind.DOUBLE || dst == TypeKind.CHAR);
+        if (src == TypeKind.FLOAT)
+            return dst == TypeKind.DOUBLE || (explicit && (dst == TypeKind.INT || dst == TypeKind.LONG || dst == TypeKind.CHAR));
+        if (src == TypeKind.DOUBLE)
+            return explicit && (dst == TypeKind.INT || dst == TypeKind.LONG || dst == TypeKind.FLOAT || dst == TypeKind.CHAR);
         return false;
     }
 }

@@ -14,6 +14,10 @@ import miniJava.SyntacticAnalyzer.TokenType;
 // return statements return TypeDenoter
 public class Matcher implements Visitor<IdTable, Object> {
     static final TypeDenoter INT_TYPE = new BaseType(TypeKind.INT, null);
+    static final TypeDenoter LONG_TYPE = new BaseType(TypeKind.LONG, null);
+    static final TypeDenoter FLOAT_TYPE = new BaseType(TypeKind.FLOAT, null);
+    static final TypeDenoter DOUBLE_TYPE = new BaseType(TypeKind.DOUBLE, null);
+    static final TypeDenoter CHAR_TYPE = new BaseType(TypeKind.CHAR, null);
     static final TypeDenoter BOOLEAN_TYPE = new BaseType(TypeKind.BOOLEAN, null);
     static final TypeDenoter UNSUPPORTED_TYPE = new BaseType(TypeKind.UNSUPPORTED, null);
     static final TypeDenoter NULL_TYPE = new ClassType(new Identifier(new Token(TokenType.NullLiteral, "null", -1, -1)), null);
@@ -66,8 +70,8 @@ public class Matcher implements Visitor<IdTable, Object> {
             ClassDecl PrintStreamDecl = new ClassDecl("_PrintStream", new FieldDeclList(), new MethodDeclList(), PREDEF_POSN);
             MethodDecl printlnMethod = new MethodDecl(new FieldDecl(false, false, new BaseType(TypeKind.VOID, PREDEF_POSN), "println", PREDEF_POSN), new ParameterDeclList(), new StatementList(), PREDEF_POSN);
             printlnMethod.specialTag = "System.out.println";
+            printlnMethod.parameterDeclList.add(new ParameterDecl(new BaseType(TypeKind.CHAR, PREDEF_POSN), "n", PREDEF_POSN));
             PrintStreamDecl.methodDeclList.add(printlnMethod);
-            PrintStreamDecl.methodDeclList.get(0).parameterDeclList.add(new ParameterDecl(new BaseType(TypeKind.INT, PREDEF_POSN), "n", PREDEF_POSN));
             ClassDecl StringDecl = new ClassDecl("String", new FieldDeclList(), new MethodDeclList(), PREDEF_POSN);
             StringDecl.unsupported = true;
             prog.classDeclList.add(SystemDecl);
@@ -197,6 +201,11 @@ public class Matcher implements Visitor<IdTable, Object> {
         arg.lockVarDecl(stmt.varDecl);
         TypeDenoter exprType = (TypeDenoter)stmt.initExp.visit(this, arg);
         arg.unlockVarDecl(stmt.varDecl);
+        if (!TypeChecker.typeMatches(exprType, declType) && TypeChecker.validCast(exprType, declType, false)) {
+            stmt.initExp = new CastExpr(declType, stmt.initExp, stmt.posn);
+            stmt.initExp.resultType = declType;
+            exprType = declType;
+        }
         checkTypeMatch("variable declaration", stmt.posn, exprType, declType);
         return null;
     }
@@ -218,6 +227,11 @@ public class Matcher implements Visitor<IdTable, Object> {
         TypeDenoter exprType = (TypeDenoter)stmt.val.visit(this, arg);
         Declaration refDecl = (Declaration)stmt.ref.visit(this, arg);
         checkIsTyped(refDecl.posn, refDecl);
+        if (!TypeChecker.typeMatches(exprType, refDecl.type) && TypeChecker.validCast(exprType, refDecl.type, false)) {
+            stmt.val = new CastExpr(refDecl.type, stmt.val, stmt.posn);
+            stmt.val.resultType = refDecl.type;
+            exprType = refDecl.type;
+        }
         checkTypeMatch("assign statement", stmt.posn, exprType, refDecl.type);
         if (refDecl.specialTag != null && refDecl.specialTag.equals("array.length")) {
             throw new MatcherError(stmt.posn, "Array length cannot be assigned to");
@@ -231,12 +245,17 @@ public class Matcher implements Visitor<IdTable, Object> {
         TypeDenoter ixType = (TypeDenoter) stmt.ix.visit(this, arg);
         Declaration refDecl = (Declaration) stmt.ref.visit(this, arg);
         checkTypeMatch("array index", stmt.posn, ixType, INT_TYPE);
-        if (refDecl.type == null || refDecl.type.typeKind != TypeKind.ARRAY)
+        if (refDecl.type == null || refDecl.type.typeKind != TypeKind.ARRAY) {
             errors.reportError(stmt.posn, String.format("Type mismatch in array element assignment statement: %s is not an array", TypeChecker.typeStr(refDecl.type)));
-        else {
-            TypeDenoter eltType = ((ArrayType) refDecl.type).eltType;
-            checkTypeMatch("array element assignment", stmt.posn, exprType, eltType);
+            return null;
         }
+        TypeDenoter eltType = ((ArrayType) refDecl.type).eltType;
+        if (!TypeChecker.typeMatches(exprType, eltType) && TypeChecker.validCast(exprType, eltType, false)) {
+            stmt.exp = new CastExpr(eltType, stmt.exp, stmt.posn);
+            stmt.exp.resultType = eltType;
+            exprType = eltType;
+        }
+        checkTypeMatch("array element assignment", stmt.posn, exprType, eltType);
         return null;
     }
 
@@ -245,18 +264,7 @@ public class Matcher implements Visitor<IdTable, Object> {
         Declaration decl = (Declaration)stmt.methodRef.visit(this, arg);
         checkIsCallable(stmt.methodRef.posn, decl);
         MethodDecl methodDecl = (MethodDecl)decl;
-        boolean sizeMatch = methodDecl.parameterDeclList.size() == stmt.argList.size();
-        if (!sizeMatch)
-            errors.reportError(stmt.posn, String.format("Called method %s with %d arguments but expected %d arguments", methodDecl.name, stmt.argList.size(), methodDecl.parameterDeclList.size()));
-        for (int i = 0; i < stmt.argList.size(); i++) {
-            Expression callArg = stmt.argList.get(i);
-            TypeDenoter argType = (TypeDenoter)callArg.visit(this, arg);
-            if (!sizeMatch) continue;
-            ParameterDecl pd = methodDecl.parameterDeclList.get(i);
-            if (!TypeChecker.typeMatches(argType, pd.type)) {
-                errors.reportError(stmt.posn, String.format("Type mismatch in method %s.%s: parameter %s expected %s, but got %s", activeClass.name, methodDecl.name, pd.name, TypeChecker.typeStr(pd.type), TypeChecker.typeStr(argType)));
-            }
-        }
+        visitCallArgs(stmt.argList, methodDecl, arg, stmt.posn);
         return null;
     }
 
@@ -264,6 +272,11 @@ public class Matcher implements Visitor<IdTable, Object> {
     public Object visitReturnStmt(ReturnStmt stmt, IdTable arg) {
         TypeDenoter retType = stmt.returnExpr == null ? VOID_TYPE : (TypeDenoter)stmt.returnExpr.visit(this, arg);
         TypeDenoter mRetType = activeMethod.type;
+        if (!TypeChecker.typeMatches(retType, mRetType) && TypeChecker.validCast(retType, mRetType, false)) {
+            stmt.returnExpr = new CastExpr(mRetType, stmt.returnExpr, stmt.returnExpr.posn);
+            stmt.returnExpr.resultType = mRetType;
+            retType = mRetType;
+        }
         checkTypeMatch(String.format("method %s.%s return statement", activeClass.name, activeMethod.name), stmt.posn, retType, mRetType);
         return retType;
     }
@@ -301,14 +314,14 @@ public class Matcher implements Visitor<IdTable, Object> {
         TypeDenoter operandType = (TypeDenoter)expr.expr.visit(this, arg);
         switch (expr.operator.kind) {
             case Minus:
-                checkTypeMatch(ctmContext, expr.posn, operandType, INT_TYPE);
-                return INT_TYPE;
+                checkTypeMatch(ctmContext, expr.posn, operandType, CHAR_TYPE, INT_TYPE, LONG_TYPE, FLOAT_TYPE, DOUBLE_TYPE, BOOLEAN_TYPE);
+                return expr.resultType = operandType;
             case LogNot:
                 checkTypeMatch(ctmContext, expr.posn, operandType, BOOLEAN_TYPE);
-                return BOOLEAN_TYPE;
+                return expr.resultType = BOOLEAN_TYPE;
             default:
                 checkTypeMatch(ctmContext, expr.posn, operandType, UNSUPPORTED_TYPE);
-                return UNSUPPORTED_TYPE;
+                return expr.resultType = UNSUPPORTED_TYPE;
         }
     }
 
@@ -316,6 +329,17 @@ public class Matcher implements Visitor<IdTable, Object> {
     public Object visitBinaryExpr(BinaryExpr expr, IdTable arg) {
         TypeDenoter leftType = (TypeDenoter)expr.left.visit(this, arg);
         TypeDenoter rightType = (TypeDenoter)expr.right.visit(this, arg);
+        if (!TypeChecker.typeMatches(leftType, rightType)) {
+            if (TypeChecker.validCast(leftType, rightType, false)) {
+                expr.left = new CastExpr(rightType, expr.left, expr.posn);
+                expr.left.resultType = rightType;
+                leftType = rightType;
+            } else if (TypeChecker.validCast(rightType, leftType, false)) {
+                expr.right = new CastExpr(leftType, expr.right, expr.posn);
+                expr.right.resultType = leftType;
+                rightType = leftType;
+            }
+        }
         String ctmContext = String.format(" side of %s binary expression", expr.operator.kind.toString().toLowerCase());
         String ctmLeftContext = "left" + ctmContext;
         String ctmRightContext = "right" + ctmContext;
@@ -323,22 +347,22 @@ public class Matcher implements Visitor<IdTable, Object> {
             case LogAnd: case LogOr:
                 checkTypeMatch(ctmLeftContext, expr.posn, leftType, BOOLEAN_TYPE);
                 checkTypeMatch(ctmRightContext, expr.posn, rightType, BOOLEAN_TYPE);
-                return BOOLEAN_TYPE;
+                return expr.resultType = BOOLEAN_TYPE;
             case RelLT: case RelGT: case RelLEq: case RelGEq:
-                checkTypeMatch(ctmLeftContext, expr.posn, leftType, INT_TYPE);
-                checkTypeMatch(ctmRightContext, expr.posn, rightType, INT_TYPE);
-                return BOOLEAN_TYPE;
+                checkTypeMatch(ctmLeftContext, expr.posn, leftType, INT_TYPE, FLOAT_TYPE, LONG_TYPE, DOUBLE_TYPE, CHAR_TYPE);
+                checkTypeMatch(ctmRightContext, expr.posn, rightType, leftType);
+                return expr.resultType = BOOLEAN_TYPE;
             case Add: case Minus: case Multiply: case Divide:
-                checkTypeMatch(ctmLeftContext, expr.posn, leftType, INT_TYPE);
-                checkTypeMatch(ctmRightContext, expr.posn, rightType, INT_TYPE);
-                return INT_TYPE;
+                checkTypeMatch(ctmLeftContext, expr.posn, leftType, INT_TYPE, FLOAT_TYPE, LONG_TYPE, DOUBLE_TYPE, CHAR_TYPE);
+                checkTypeMatch(ctmRightContext, expr.posn, rightType, leftType);
+                return expr.resultType = leftType;
             case RelEq: case RelNEq:
                 checkTypeMatch(ctmRightContext, expr.posn, rightType, leftType);
-                return BOOLEAN_TYPE;
+                return expr.resultType = BOOLEAN_TYPE;
             default:
                 checkTypeMatch(ctmLeftContext, expr.posn, leftType, UNSUPPORTED_TYPE);
                 checkTypeMatch(ctmRightContext, expr.posn, rightType, UNSUPPORTED_TYPE);
-                return UNSUPPORTED_TYPE;
+                return expr.resultType = UNSUPPORTED_TYPE;
         }
     }
 
@@ -346,7 +370,7 @@ public class Matcher implements Visitor<IdTable, Object> {
     public Object visitRefExpr(RefExpr expr, IdTable arg) {
         Declaration decl = (Declaration)expr.ref.visit(this, arg);
         checkIsTyped(expr.ref.posn, decl);
-        return decl.type;
+        return expr.resultType = decl.type;
     }
 
     @Override
@@ -358,7 +382,28 @@ public class Matcher implements Visitor<IdTable, Object> {
         if (refDecl.type == null || refDecl.type.typeKind != TypeKind.ARRAY) {
             throw new MatcherError(expr.posn, String.format("%s is not an array", TypeChecker.typeStr(refDecl.type)));
         }
-        return ((ArrayType) refDecl.type).eltType;
+        return expr.resultType = ((ArrayType) refDecl.type).eltType;
+    }
+
+    private void visitCallArgs(ExprList argList, MethodDecl methodDecl, IdTable arg, SourcePosition posn) {
+        boolean sizeMatch = methodDecl.parameterDeclList.size() == argList.size();
+        if (!sizeMatch)
+            errors.reportError(posn, String.format("Called method %s with %d arguments but expected %d arguments", methodDecl.name, argList.size(), methodDecl.parameterDeclList.size()));
+        for (int i = 0; i < argList.size(); i++) {
+            Expression callArg = argList.get(i);
+            TypeDenoter argType = (TypeDenoter)callArg.visit(this, arg);
+            if (!sizeMatch) continue;
+            ParameterDecl pd = methodDecl.parameterDeclList.get(i);
+            if (!TypeChecker.typeMatches(argType, pd.type)) {
+                if (TypeChecker.validCast(argType, pd.type, false)) {
+                    argList.set(i, new CastExpr(pd.type, callArg, callArg.posn));
+                    callArg = argList.get(i);
+                    callArg.resultType = pd.type;
+                } else {
+                    errors.reportError(posn, String.format("Type mismatch in method %s: parameter %s expected %s, but got %s", methodDecl.name, pd.name, TypeChecker.typeStr(pd.type), TypeChecker.typeStr(argType)));
+                }
+            }
+        }
     }
 
     @Override
@@ -366,45 +411,41 @@ public class Matcher implements Visitor<IdTable, Object> {
         Declaration decl = (Declaration) expr.functionRef.visit(this, arg);
         checkIsCallable(expr.functionRef.posn, decl);
         MethodDecl methodDecl = (MethodDecl)decl;
-        boolean sizeMatch = methodDecl.parameterDeclList.size() == expr.argList.size();
-        if (!sizeMatch)
-            errors.reportError(expr.posn, String.format("Called method %s with %d arguments but expected %d arguments", methodDecl.name, expr.argList.size(), methodDecl.parameterDeclList.size()));
-        for (int i = 0; i < expr.argList.size(); i++) {
-            Expression callArg = expr.argList.get(i);
-            TypeDenoter argType = (TypeDenoter)callArg.visit(this, arg);
-            if (!sizeMatch) continue;
-            ParameterDecl pd = methodDecl.parameterDeclList.get(i);
-            if (!TypeChecker.typeMatches(argType, pd.type)) {
-                errors.reportError(expr.posn, String.format("Type mismatch in method %s: parameter %s expected %s, but got %s", methodDecl.name, pd.name, pd.type, argType));
-            }
-        }
-        return methodDecl.type;
+        visitCallArgs(expr.argList, methodDecl, arg, expr.posn);
+        return expr.resultType = methodDecl.type;
     }
 
     @Override
     public Object visitLiteralExpr(LiteralExpr expr, IdTable arg) {
-        return expr.lit.visit(this, arg);
+        return expr.resultType = (TypeDenoter)expr.lit.visit(this, arg);
     }
 
     @Override
     public Object visitNewObjectExpr(NewObjectExpr expr, IdTable arg) {
         ClassDecl decl = arg.getClassDecl(expr.posn, expr.classtype.className.spelling);
-        return decl.unsupported ? UNSUPPORTED_TYPE : expr.classtype;
+        return expr.resultType = decl.unsupported ? UNSUPPORTED_TYPE : expr.classtype;
     }
 
     @Override
     public Object visitNewArrayExpr(NewArrayExpr expr, IdTable arg) {
         TypeDenoter sizeType = (TypeDenoter)expr.sizeExpr.visit(this, arg);
         checkTypeMatch("new array size expression", expr.posn, sizeType, INT_TYPE);
-        return new ArrayType(expr.eltType, expr.posn);
+        return expr.resultType = new ArrayType(expr.eltType, expr.posn);
+    }
+
+    @Override
+    public Object visitCastExpr(CastExpr expr, IdTable arg) {
+        TypeDenoter srcType = (TypeDenoter)expr.expr.visit(this, arg);
+        if (!TypeChecker.validCast(expr.type, srcType, true))
+            errors.reportError(expr.posn, String.format("Cannot cast type %s to %s", TypeChecker.typeStr(srcType), TypeChecker.typeStr(expr.type)));
+        return expr.resultType = expr.type;
     }
 
     @Override
     public Object visitThisRef(ThisRef ref, IdTable arg) {
         if (staticActive)
             throw new MatcherError(ref.posn, "Cannot reference this in a static context");
-        ref.decl = new VarDecl(new ClassType(new Identifier(new Token(TokenType.Identifier, activeClass.name, PREDEF_POSN.line, PREDEF_POSN.offset)), PREDEF_POSN), "this", PREDEF_POSN);
-        return ref.decl;
+        return ref.decl = new VarDecl(new ClassType(new Identifier(new Token(TokenType.Identifier, activeClass.name, PREDEF_POSN.line, PREDEF_POSN.offset)), PREDEF_POSN), "this", PREDEF_POSN);
     }
 
     @Override
@@ -414,8 +455,7 @@ public class Matcher implements Visitor<IdTable, Object> {
             if (decl instanceof MemberDecl && !((MemberDecl)decl).isStatic)
                 throw new MatcherError(ref.posn, String.format("member %s.%s is not accessible from static context", activeClass.name, ref.id.spelling));
         }
-        ref.decl = (Declaration)ref.id.visit(this, arg);
-        return ref.decl;
+        return ref.decl = (Declaration)ref.id.visit(this, arg);
     }
 
     @Override
@@ -446,14 +486,12 @@ public class Matcher implements Visitor<IdTable, Object> {
             throw new MatcherError(ref.id.posn, String.format("Cannot non-static member %s from class %s", decl.name, className));
         if (decl.isPrivate && !isActiveClass)
             throw new MatcherError(ref.id.posn, String.format("%s.%s is private", className, decl.name));
-        ref.decl = decl;
-        return decl;
+        return ref.decl = decl;
     }
 
     @Override
     public Object visitIdentifier(Identifier id, IdTable arg) {
-        id.decl = arg.getScopedDecl(id.posn, id.spelling);
-        return id.decl;
+        return id.decl = arg.getScopedDecl(id.posn, id.spelling);
     }
 
     @Override
@@ -474,5 +512,25 @@ public class Matcher implements Visitor<IdTable, Object> {
     @Override
     public Object visitNullLiteral(NullLiteral nullLiteral, IdTable asm) {
         return NULL_TYPE;
+    }
+
+    @Override
+    public Object visitLongLiteral(LongLiteral longLiteral, IdTable arg) {
+        return LONG_TYPE;
+    }
+
+    @Override
+    public Object visitFloatLiteral(FloatLiteral floatLiteral, IdTable arg) {
+        return FLOAT_TYPE;
+    }
+
+    @Override
+    public Object visitDoubleLiteral(DoubleLiteral doubleLiteral, IdTable arg) {
+        return DOUBLE_TYPE;
+    }
+
+    @Override
+    public Object visitCharLiteral(CharLiteral charLiteral, IdTable arg) {
+        return CHAR_TYPE;
     }
 }
