@@ -69,8 +69,21 @@ X? - Optional
 `// single line`\
 `/* multiline */`
 #### Prepackaged Members
-`System.out.println(x);` allows you to print the ascii value `x` (`x` is an int)
+`System.out.println(x);` allows you to print the ascii value `x` (`x` is type `char`)
 `array.length` allows you to get the length of array objects (is an int, cannot be assigned to)
+#### Base Type Examples
+`boolean foo = false;`\
+`char foo = 'a'; // 1 byte signed integer value`\
+`int foo = 0; // 4 bytes signed integer value`\
+`long foo = 0L; // 8 byte signed integer value`\
+`float foo = 0.5f; // 4 byte floating point value`\
+`double foo = 1.5; // 8 byte floating point value`
+#### Type Casting Examples
+`int a = 0;`\
+`long b = a;`\
+`a = (int)b;`\
+`float f = (float)b;`
+
 ### Directory Structure
 Note: certain files omitted for brevity\
 `project` - root directory
@@ -133,6 +146,10 @@ Declarations are organized into levels, with the highest level getting priority.
 - Level 0 - Class declarations
 - Level 1 - Class member declarations
 - Level 2+ - Local variables (each nested scope adds a level)
+#### Type Casting
+Certain base types can be cast to other types either implicitly or with explicit casts.\
+Implicit casts: char to int, int to long, char to long, and float to double.\
+Explicit casts: any other cast between char, int, long, float, and double.
 
 A local variable cannot shadow another local variable.
 #### Code
@@ -145,9 +162,11 @@ Error messages follow format listed under Syntax Analysis section. Care was take
 #### Goal
 Convert the decorated AST into x64 assembly code and package it into an ELF file that can be executed on a Linux kernel.
 #### Data Handling
-All data is stored as 8 byte values.\
+All data 8 byte aligned.\
 Objects are located on the heap and get 4096 bytes of memory each.
 Objects are represented by their pointers rather than direct data, and as a result, they are passed around by reference while primitive types are passed around by value.\
+Math operations handled by the ALUHandler (`CodeGeneration/ALUHandler.java`).\
+Floating point operations handled by the FPUHandler(`CodeGeneration/FPUHandler.java`).
 #### Static/Nonstatic Data Handling
 Static class field data is stored at the bottom of the stack.\
 The location of the bottom of the stack is written into the start of the `.text` segment at the start of execution, and is accessible by offsetting the current `rip` register value by the instruction's byte offset in the `.text` segment.
