@@ -70,7 +70,7 @@ public class Matcher implements Visitor<IdTable, Object> {
             ClassDecl PrintStreamDecl = new ClassDecl("_PrintStream", new FieldDeclList(), new MethodDeclList(), PREDEF_POSN);
             MethodDecl printlnMethod = new MethodDecl(new FieldDecl(false, false, new BaseType(TypeKind.VOID, PREDEF_POSN), "println", PREDEF_POSN), new ParameterDeclList(), new StatementList(), PREDEF_POSN);
             printlnMethod.specialTag = "System.out.println";
-            printlnMethod.parameterDeclList.add(new ParameterDecl(new BaseType(TypeKind.CHAR, PREDEF_POSN), "n", PREDEF_POSN));
+            printlnMethod.parameterDeclList.add(new ParameterDecl(new BaseType(TypeKind.INT, PREDEF_POSN), "n", PREDEF_POSN));
             PrintStreamDecl.methodDeclList.add(printlnMethod);
             ClassDecl StringDecl = new ClassDecl("String", new FieldDeclList(), new MethodDeclList(), PREDEF_POSN);
             StringDecl.unsupported = true;

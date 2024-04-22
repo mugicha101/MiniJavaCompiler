@@ -69,7 +69,7 @@ X? - Optional
 `// single line`\
 `/* multiline */`
 #### Prepackaged Members
-`System.out.println(x);` allows you to print the ascii value `x` (`x` is type `char`)
+`System.out.println(x);` allows you to print the ascii value `x` (`x` is type `int`)
 `array.length` allows you to get the length of array objects (is an int, cannot be assigned to)
 #### Base Type Examples
 `boolean foo = false;`\
