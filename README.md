@@ -45,13 +45,15 @@ X? - Optional
 | Reference ::= `this`                                                                                  | ThisRef           |
 | Reference ::= Reference `.` Id                                                                        | QualRef           |
 | Statement ::= `{` Statement* `}`                                                                      | BlockStmt         |
-| Statement ::= Type Id `=` Expression `;`                                                              | VarDeclStmt       |
-| Statement ::= Reference `=` Expression `;`                                                            | AssignStmt        |
-| Statement ::= Reference `[` Expression `]` = Expression `;`                                           | IxAssignStmt      |
-| Statement ::= Reference `(` ArgumentList? `)` `;`                                                     | CallStmt          |
-| Statement ::= `return` (Expression)? `;`                                                              | ReturnStmt        |
 | Statement ::= `if` `(` Expression `)` Statement (`else` Statement)?                                   | IfStmt            |
 | Statement ::= `while` `(` Expression `)` Statement                                                    | WhileStmt         |
+| Statement ::= `for` `(` ShortStatement? `;` Expression? `;` ShortStatement? `)` Statement             | ForStmt           |
+| Statement ::= ShortStatement `;`                                                                      | Stmt              |
+| ShortStatement ::= Type Id `=` Expression                                                             | VarDeclStmt       |
+| ShortStatement ::= Reference `=` Expression                                                           | AssignStmt        |
+| ShortStatement ::= Reference `[` Expression `]` = Expression                                          | IxAssignStmt      |
+| ShortStatement ::= Reference `(` ArgumentList? `)`                                                    | CallStmt          |
+| ShortStatement ::= `return` Expression?                                                               | ReturnStmt        |
 | Expression ::= Reference                                                                              | RefExpr           |
 | Expression ::= Reference `[` Expression `]`                                                           | IxExpr            |
 | Expression ::= Reference `(` ArgumentList? `)`                                                        | CallExpr          |

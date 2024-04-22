@@ -324,7 +324,7 @@ public class Scanner {
 			}
 		}
 		if (tokenType == TokenType.StringLiteral || tokenType == TokenType.CharLiteral) {
-			currText = new StringBuilder(currText.toString().substring(1, currText.length()-1).replaceAll("\\n", "\n"));
+			currText = new StringBuilder(currText.substring(1, currText.length()-1).replaceAll("\\\\n", "\n"));
 			if (tokenType == TokenType.CharLiteral && currText.length() != 1) {
 				errors.reportError(String.format("Invalid char literal '%s'", currText));
 			}

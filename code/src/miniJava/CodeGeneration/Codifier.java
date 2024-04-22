@@ -552,6 +552,37 @@ public class Codifier implements Visitor<Object, Object> {
     }
 
     @Override
+    public Object visitForStmt(ForStmt stmt, Object arg) {
+        stmt.asmOffset = asm.getSize();
+
+        // push scope and init
+        blockScopeStackSizes.push(0);
+        stmt.init.visit(this, arg);
+
+        // initial jump
+        String condJmpLabel = "condJmpLabel " + genNonce();
+        addUnresolved(instr(new Jmp(0, 0, false)), condJmpLabel);
+
+        // body, incr
+        int loopTopAddress = asm.getSize();
+        stmt.body.visit(this, arg);
+        stmt.incr.visit(this, arg);
+
+        // condition
+        addLabel(condJmpLabel);
+        stmt.cond.visit(this, arg);
+        instr(new Pop(Reg64.RAX));
+        instr(new Cmp(new ModRMSIB(Reg64.RAX, true), 1)); // check if true
+        instr(new CondJmp(Condition.E, asm.getSize(), loopTopAddress, false)); // jump if true
+
+        // pop scope
+        int popSize = blockScopeStackSizes.pop();
+        rbpOffset += popSize;
+        instr(new Lea(new ModRMSIB(Reg64.RSP, popSize, Reg64.RSP)));
+        return null;
+    }
+
+    @Override
     public Object visitUnaryExpr(UnaryExpr expr, Object arg) {
         expr.asmOffset = asm.getSize();
         expr.expr.visit(this, arg);

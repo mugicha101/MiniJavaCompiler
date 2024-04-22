@@ -309,6 +309,19 @@ public class Matcher implements Visitor<IdTable, Object> {
     }
 
     @Override
+    public Object visitForStmt(ForStmt stmt, IdTable arg) {
+        arg.openScope();
+        stmt.init.visit(this, arg);
+        TypeDenoter condType = (TypeDenoter)stmt.cond.visit(this, arg);
+        checkTypeMatch("for statement condition", stmt.posn, condType, BOOLEAN_TYPE);
+        stmt.incr.visit(this, arg);
+        checkIsolatedVarDeclStmt(stmt.body);
+        stmt.body.visit(this, arg);
+        arg.closeScope();
+        return null;
+    }
+
+    @Override
     public Object visitUnaryExpr(UnaryExpr expr, IdTable arg) {
         String ctmContext = String.format("%s unary expression", expr.operator.kind.toString().toLowerCase());
         TypeDenoter operandType = (TypeDenoter)expr.expr.visit(this, arg);

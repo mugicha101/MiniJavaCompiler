@@ -322,9 +322,9 @@ public class Parser {
 	//     | return Expression? ;
 	//     | if \( Expression \) Statement (else Statement)?
 	//     | while \( Expression \) Statement
-	private Statement parseOptionalStatement() {
+	private Statement parseOptionalStatement(boolean isShort) {
 		SourcePosition stmtPos = currToken.getTokenPosition();
-		if (optionalAccept(TokenType.LCurly)) {
+		if (!isShort && optionalAccept(TokenType.LCurly)) {
 			StatementList stmtList = new StatementList();
 			Statement nestedStmt = parseOptionalStatement();
 			while (nestedStmt != null) {
@@ -355,7 +355,7 @@ public class Parser {
 				// id [ expr ] = expr ;
 				accept(TokenType.AssignmentOp);
 				Expression assignExpr = parseExpression();
-				accept(TokenType.Semicolon);
+				if (!isShort) accept(TokenType.Semicolon);
 				return new IxAssignStmt(new IdRef(new Identifier(id), id.getTokenPosition()), ixExpr, assignExpr, stmtPos);
 			} else if (currTokenMatches(TokenType.Dot)) {
 				// ref = id (. ref)+
@@ -370,7 +370,7 @@ public class Parser {
 					accept(TokenType.RBracket);
 					accept(TokenType.AssignmentOp);
 					Expression assignExpr = parseExpression();
-					accept(TokenType.Semicolon);
+					if (!isShort) accept(TokenType.Semicolon);
 					return new IxAssignStmt(ref, ixExpr, assignExpr, stmtPos);
 				}
 				if (optionalAccept(TokenType.LParen)) {
@@ -378,13 +378,13 @@ public class Parser {
 					ExprList argList = parseOptionalArgumentList();
 					if (argList == null) argList = new ExprList();
 					accept(TokenType.RParen);
-					accept(TokenType.Semicolon);
+					if (!isShort) accept(TokenType.Semicolon);
 					return new CallStmt(ref, argList, stmtPos);
 				}
 				// id (. id)+ = expr ;
 				accept(TokenType.AssignmentOp);
 				Expression assignExpr = parseExpression();
-				accept(TokenType.Semicolon);
+				if (!isShort) accept(TokenType.Semicolon);
 				return new AssignStmt(ref, assignExpr, stmtPos);
 			} else if (optionalAccept(TokenType.LParen)) {
 				// id ( argList ) ;
@@ -392,7 +392,7 @@ public class Parser {
 				ExprList argList = parseOptionalArgumentList();
 				if (argList == null) argList = new ExprList();
 				accept(TokenType.RParen);
-				accept(TokenType.Semicolon);
+				if (!isShort) accept(TokenType.Semicolon);
 				return new CallStmt(ref, argList, stmtPos);
 			}
 			// id id? = expr ;
@@ -403,7 +403,7 @@ public class Parser {
 			}
 			accept(TokenType.AssignmentOp);
 			Expression assignExpr = parseExpression();
-			accept(TokenType.Semicolon);
+			if (!isShort) accept(TokenType.Semicolon);
 			if (id2 == null)
 				return new AssignStmt(new IdRef(new Identifier(id), id.getTokenPosition()), assignExpr, stmtPos);
 			return new VarDeclStmt(new VarDecl(new ClassType(new Identifier(id), id.getTokenPosition()), id2.getTokenText(), id.getTokenPosition()), assignExpr, stmtPos);
@@ -414,7 +414,7 @@ public class Parser {
 			Token id = currToken;
 			accept(TokenType.Identifier, TokenType.AssignmentOp);
 			Expression assignExpr = parseExpression();
-			accept(TokenType.Semicolon);
+			if (!isShort) accept(TokenType.Semicolon);
 			return new VarDeclStmt(new VarDecl(type, id.getTokenText(), id.getTokenPosition()), assignExpr, stmtPos);
 		}
 		Reference ref = parseOptionalReference();
@@ -425,19 +425,19 @@ public class Parser {
 				Expression ixExpr = parseExpression();
 				accept(TokenType.RBracket, TokenType.AssignmentOp);
 				Expression assignExpr = parseExpression();
-				accept(TokenType.Semicolon);
+				if (!isShort) accept(TokenType.Semicolon);
 				return new IxAssignStmt(ref, ixExpr, assignExpr, stmtPos);
 			} else if (optionalAccept(TokenType.AssignmentOp)) {
 				// ref = expr ;
 				Expression assignExpr = parseExpression();
-				accept(TokenType.Semicolon);
+				if (!isShort) accept(TokenType.Semicolon);
 				return new AssignStmt(ref, assignExpr, stmtPos);
 			} else if (optionalAccept(TokenType.LParen)) {
 				// ref ( argList? ) ;
 				ExprList argList = parseOptionalArgumentList();
 				if (argList == null) argList = new ExprList();
 				accept(TokenType.RParen);
-				accept(TokenType.Semicolon);
+				if (!isShort) accept(TokenType.Semicolon);
 				return new CallStmt(ref, argList, stmtPos);
 			}
 			errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("expected = or [ or ( after reference, but got %s", currToken.getTokenText()));
@@ -446,9 +446,11 @@ public class Parser {
 		if (optionalAccept(TokenType.Return)) {
 			// return expr? ;
 			Expression expr = parseOptionalExpression();
-			accept(TokenType.Semicolon);
+			if (!isShort) accept(TokenType.Semicolon);
 			return new ReturnStmt(expr, stmtPos);
 		}
+		if (isShort) return null;
+
 		if (optionalAccept(TokenType.If)) {
 			// if ( expr ) stmt (else stmt)?
 			accept(TokenType.LParen);
@@ -469,13 +471,33 @@ public class Parser {
 			Statement whileBodyStmt = parseStatement();
 			return new WhileStmt(condExpr, whileBodyStmt, stmtPos);
 		}
+		if (optionalAccept(TokenType.For)) {
+			// for ( shortstmt? ; expr? ; shortstmt? ) stmt
+			accept(TokenType.LParen);
+			Statement initStmt = parseOptionalStatement(true);
+			accept(TokenType.Semicolon);
+			Expression condExpr = parseOptionalExpression();
+			accept(TokenType.Semicolon);
+			Statement incrStmt = parseOptionalStatement(true);
+			accept(TokenType.RParen);
+			Statement body = parseStatement();
+			return new ForStmt(initStmt, condExpr, incrStmt, body, stmtPos);
+		}
 		return null;
 	}
-	private Statement parseStatement() throws SyntaxError {
-		Statement stmt = parseOptionalStatement();
+	private Statement parseStatement(boolean isShort) throws SyntaxError {
+		Statement stmt = parseOptionalStatement(isShort);
 		if (stmt != null) return stmt;
 		errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected start of statement, but got %s", currToken.getTokenText()));
 		throw new SyntaxError();
+	}
+
+	private Statement parseOptionalStatement() throws SyntaxError {
+		return parseOptionalStatement(false);
+	}
+
+	private Statement parseStatement() throws SyntaxError {
+		return parseStatement(false);
 	}
 
 	// Expression ::=

@@ -33,12 +33,16 @@ class MainClass {
         NumPrint.printd(arr.length);
         NumPrint.printd(10/2);
         NumPrint.printd(-10/2);
+        for (int j = -15; j <= 15; j = j + 1) {
+            NumPrint.printd(j);
+        }
     }
 }
 class NumPrint {
     private static void print(long x, long mod) {
         if (x == 0) {
             System.out.println('0');
+            System.out.println('\n');
             return;
         }
         if (x < 0) {
@@ -68,7 +72,7 @@ class NumPrint {
             i = i + 1;
             s = s * mod;
         }
-        System.out.println((char)10);
+        System.out.println('\n');
     }
 
     public static void printd(long x) {
