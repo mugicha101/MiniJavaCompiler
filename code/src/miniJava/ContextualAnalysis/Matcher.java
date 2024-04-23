@@ -7,6 +7,9 @@ import miniJava.SyntacticAnalyzer.SourcePosition;
 import miniJava.SyntacticAnalyzer.Token;
 import miniJava.SyntacticAnalyzer.TokenType;
 
+import java.util.ArrayList;
+import java.util.List;
+
 // references return Declaration
 // identifiers return Declaration
 // expressions return TypeDenoter
@@ -95,10 +98,33 @@ public class Matcher implements Visitor<IdTable, Object> {
 
     @Override
     public Object visitPackage(Package prog, IdTable arg) {
+        // add predefined objects
         addPredefined(prog);
+
         for (ClassDecl classDecl : prog.classDeclList) {
+            // assign parents to members
+            for (MethodDecl method : classDecl.methodDeclList) {
+                method.parent = classDecl;
+            }
+            for (FieldDecl field : classDecl.fieldDeclList) {
+                field.parent = classDecl;
+            }
+
+            // assign signatures to methods
+            for (MethodDecl method : classDecl.methodDeclList) {
+                for (ParameterDecl param : method.parameterDeclList) {
+                    method.signature.argTypes.add(param.type);
+                }
+            }
+
+            // add class and members to scoped id table
             arg.addClassDecl(classDecl);
             arg.addScopedDecl(classDecl);
+
+            // update method name to signature name
+            for (MethodDecl method : classDecl.methodDeclList) {
+                method.name = method.signature.toString();
+            }
         }
         for (ClassDecl classDecl : prog.classDeclList)
             classDecl.visit(this, arg);
@@ -112,17 +138,19 @@ public class Matcher implements Visitor<IdTable, Object> {
 
         // add members to scope
         for (FieldDecl fieldDecl : cd.fieldDeclList)
-            arg.addScopedDecl(fieldDecl);
-        for (MethodDecl methodDecl : cd.methodDeclList)
-            arg.addScopedDecl(methodDecl);
+            arg.addScopedDecl(fieldDecl); // field name --> method decl
+        for (MethodDecl methodDecl : cd.methodDeclList) {
+            arg.addScopedDecl(methodDecl); // method signature string --> method decl
+        }
+        for (SigGroup sigGroup : arg.getClassSigGroups(cd.posn, cd.name)) {
+            arg.addScopedDecl(sigGroup); // method name --> signature group
+        }
 
-        // identify
+        // visit
         for (FieldDecl fieldDecl : cd.fieldDeclList) {
-            fieldDecl.parent = cd;
             fieldDecl.visit(this, arg);
         }
         for (MethodDecl methodDecl : cd.methodDeclList) {
-            methodDecl.parent = cd;
             methodDecl.visit(this, arg);
         }
 
@@ -218,7 +246,7 @@ public class Matcher implements Visitor<IdTable, Object> {
     }
 
     void checkIsCallable(SourcePosition posn, Declaration decl) {
-        if (!(decl instanceof MethodDecl))
+        if (!(decl instanceof SigGroup))
             throw new MatcherError(posn, String.format("%s is not callable", decl.name));
     }
 
@@ -263,8 +291,8 @@ public class Matcher implements Visitor<IdTable, Object> {
     public Object visitCallStmt(CallStmt stmt, IdTable arg) {
         Declaration decl = (Declaration)stmt.methodRef.visit(this, arg);
         checkIsCallable(stmt.methodRef.posn, decl);
-        MethodDecl methodDecl = (MethodDecl)decl;
-        visitCallArgs(stmt.argList, methodDecl, arg, stmt.posn);
+        SigGroup sigGroup = (SigGroup)decl;
+        visitCallArgs(stmt.methodRef, stmt.argList, sigGroup, arg, stmt.posn);
         return null;
     }
 
@@ -400,34 +428,89 @@ public class Matcher implements Visitor<IdTable, Object> {
         return expr.resultType = ((ArrayType) refDecl.type).eltType;
     }
 
-    private void visitCallArgs(ExprList argList, MethodDecl methodDecl, IdTable arg, SourcePosition posn) {
-        boolean sizeMatch = methodDecl.parameterDeclList.size() == argList.size();
-        if (!sizeMatch)
-            errors.reportError(posn, String.format("Called method %s with %d arguments but expected %d arguments", methodDecl.name, argList.size(), methodDecl.parameterDeclList.size()));
+    private TypeDenoter visitCallArgs(Reference methodRef, ExprList argList, SigGroup sigGroup, IdTable arg, SourcePosition posn) {
+        // determine call signature based on arg types and sig group name
+        Signature callSig = new Signature(null);
+        callSig.name = sigGroup.name;
         for (int i = 0; i < argList.size(); i++) {
             Expression callArg = argList.get(i);
             TypeDenoter argType = (TypeDenoter)callArg.visit(this, arg);
-            if (!sizeMatch) continue;
-            ParameterDecl pd = methodDecl.parameterDeclList.get(i);
-            if (!TypeChecker.typeMatches(argType, pd.type)) {
-                if (TypeChecker.validCast(argType, pd.type, false)) {
-                    argList.set(i, new CastExpr(pd.type, callArg, callArg.posn));
-                    callArg = argList.get(i);
-                    callArg.resultType = pd.type;
-                } else {
-                    errors.reportError(posn, String.format("Type mismatch in method %s: parameter %s expected %s, but got %s", methodDecl.name, pd.name, TypeChecker.typeStr(pd.type), TypeChecker.typeStr(argType)));
+            callSig.argTypes.add(argType);
+        }
+
+        // derive matching sig from sig group based on call signature
+        Signature methodSig = null;
+
+        // if exact match, pick that
+        // otherwise, determine if any signatures can be implicitly cast to
+        // if exactly one signature can be implicitly cast to, pick it
+        // otherwise either no match or ambiguous
+        List<Signature> castSigs = new ArrayList<>();
+        for (Signature sig : sigGroup.sigs) {
+            if (callSig.equals(sig)) {
+                methodSig = sig;
+                break;
+            } else if (TypeChecker.validCast(callSig, sig))
+                castSigs.add(sig);
+        }
+        if (methodSig == null) {
+            if (castSigs.size() > 1) {
+                StringBuilder errorMsg = new StringBuilder(String.format("Method call %s.%s with signature %s is ambiguous as it matches %d implicit cast signatures: ", sigGroup.parent.name, sigGroup.name, callSig.toString(), castSigs.size()));
+                boolean first = true;
+                for (Signature sig : castSigs) {
+                    if (first) first = false;
+                    else errorMsg.append(", ");
+                    errorMsg.append(sig.toString());
                 }
+                throw new MatcherError(posn, errorMsg.toString());
+            } else if (castSigs.isEmpty()) {
+                StringBuilder errorMsg = new StringBuilder(String.format("Method call %s.%s with signature %s does not match any of the following signatures: ", sigGroup.parent.name, sigGroup.name, callSig.toString()));
+                boolean first = true;
+                for (Signature sig : sigGroup.sigs) {
+                    if (first) first = false;
+                    else errorMsg.append(", ");
+                    errorMsg.append(sig.toString());
+                }
+                throw new MatcherError(posn, errorMsg.toString());
+            }
+            methodSig = castSigs.get(0);
+        }
+
+        // do static check
+        if (sigGroup.lastRefStatic && !methodSig.decl.isStatic) {
+            throw new MatcherError(posn, String.format("Cannot access private method %s.%s from static context", methodSig.decl.parent.name, methodSig));
+        }
+        // do private check
+        boolean allowPrivate = activeClass == sigGroup.parent;
+        if (!allowPrivate && methodSig.decl.isPrivate) {
+            throw new MatcherError(posn, String.format("Cannot access private method %s.%s from external context", methodSig.decl.parent.name, methodSig));
+        }
+
+        // add implicit type casts
+        for (int i = 0; i < argList.size(); i++) {
+            ParameterDecl pd = methodSig.decl.parameterDeclList.get(i);
+            TypeDenoter argType = callSig.argTypes.get(i);
+            Expression argExpr = argList.get(i);
+            if (!TypeChecker.typeMatches(argType, pd.type)) {
+                argList.set(i, new CastExpr(pd.type, argExpr, argExpr.posn));
+                argExpr = argList.get(i);
+                argExpr.resultType = pd.type;
             }
         }
+
+        // reassign decl of reference to match method decl
+        methodRef.decl = methodSig.decl;
+
+        // return ret type of method
+        return methodSig.decl.type;
     }
 
     @Override
     public Object visitCallExpr(CallExpr expr, IdTable arg) {
         Declaration decl = (Declaration) expr.functionRef.visit(this, arg);
         checkIsCallable(expr.functionRef.posn, decl);
-        MethodDecl methodDecl = (MethodDecl)decl;
-        visitCallArgs(expr.argList, methodDecl, arg, expr.posn);
-        return expr.resultType = methodDecl.type;
+        SigGroup sigGroup = (SigGroup)decl;
+        return expr.resultType = visitCallArgs(expr.functionRef, expr.argList, sigGroup, arg, expr.posn);
     }
 
     @Override
@@ -466,7 +549,12 @@ public class Matcher implements Visitor<IdTable, Object> {
     @Override
     public Object visitIdRef(IdRef ref, IdTable arg) {
         Declaration decl = arg.getScopedDecl(ref.posn, ref.id.spelling);
-        if (staticActive) {
+        if (decl instanceof SigGroup) {
+            // handle sig group static when method resolved
+            SigGroup sigGroup = (SigGroup)decl;
+            sigGroup.lastRefStatic = staticActive;
+        } else if (staticActive) {
+            // handle static check
             if (decl instanceof MemberDecl && !((MemberDecl)decl).isStatic)
                 throw new MatcherError(ref.posn, String.format("member %s.%s is not accessible from static context", activeClass.name, ref.id.spelling));
         }
@@ -478,7 +566,7 @@ public class Matcher implements Visitor<IdTable, Object> {
         // get ref info
         Declaration refDecl = (Declaration)ref.ref.visit(this, arg);
         if (refDecl instanceof MethodDecl)
-            throw new MatcherError(ref.ref.posn, String.format("Cannot access members of method %s", refDecl.name));
+            throw new MatcherError(ref.ref.posn, String.format("Cannot access members of method %s", ref.id.spelling));
         String className = getClassName(refDecl);
         if (className == null)
             throw new MatcherError(ref.ref.posn, String.format("Cannot access members of base type %s", TypeChecker.typeStr(refDecl.type)));
@@ -497,10 +585,17 @@ public class Matcher implements Visitor<IdTable, Object> {
         // find id in ref (don't call visit on id to avoid scope check)
         MemberDecl decl = arg.getClassMember(ref.id.posn, classDecl.name, ref.id.spelling);
         ref.id.decl = decl;
-        if (isClass && !decl.isStatic)
-            throw new MatcherError(ref.id.posn, String.format("Cannot non-static member %s from class %s", decl.name, className));
-        if (decl.isPrivate && !isActiveClass)
-            throw new MatcherError(ref.id.posn, String.format("%s.%s is private", className, decl.name));
+        if (decl instanceof SigGroup) {
+            // if sig group handle private and static checks after method decl resolved
+            SigGroup sigGroup = (SigGroup)decl;
+            sigGroup.lastRefStatic = isClass;
+        } else {
+            // handle private and static checks
+            if (isClass && !decl.isStatic)
+                throw new MatcherError(ref.id.posn, String.format("Cannot access non-static member %s from class %s", decl.name, className));
+            if (decl.isPrivate && !isActiveClass)
+                throw new MatcherError(ref.id.posn, String.format("Cannot access private member %s.%s from external class", className, decl.name));
+        }
         return ref.decl = decl;
     }
 

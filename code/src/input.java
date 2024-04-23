@@ -25,6 +25,8 @@ class MainClass {
         NumPrint.printd((int)valFloat);
         NumPrint.printd((int)(valDouble + 5.));
         char valChar = 'a';
+        System.out.println(valChar);
+        System.out.println('\n');
         a = 727;
         NumPrint.printd(a);
         b = 1831;
@@ -33,9 +35,37 @@ class MainClass {
         NumPrint.printd(arr.length);
         NumPrint.printd(10/2);
         NumPrint.printd(-10/2);
-        for (int j = -15; j <= 15; j = j + 1) {
+        for (int j = -5; j <= 5; j = j + 1) {
             NumPrint.printd(j);
         }
+
+        overloaded(0);
+        overloaded(0.f);
+        amb(0L, 0);
+    }
+
+    public static void overloaded(int x) {
+        System.out.println('o');
+        System.out.println('d');
+        System.out.println('\n');
+    }
+
+    public static void overloaded(float x) {
+        System.out.println('o');
+        System.out.println('f');
+        System.out.println('\n');
+    }
+
+    public static void amb(int x, long y) {
+        System.out.println('A');
+        System.out.println('1');
+        System.out.println('\n');
+    }
+
+    public static void amb(long x, int y) {
+        System.out.println('A');
+        System.out.println('2');
+        System.out.println('\n');
     }
 }
 class NumPrint {

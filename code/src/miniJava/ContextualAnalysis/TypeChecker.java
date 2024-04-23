@@ -1,14 +1,8 @@
 package miniJava.ContextualAnalysis;
 
-import miniJava.AbstractSyntaxTrees.ArrayType;
-import miniJava.AbstractSyntaxTrees.ClassType;
-import miniJava.AbstractSyntaxTrees.TypeDenoter;
-import miniJava.AbstractSyntaxTrees.TypeKind;
+import miniJava.AbstractSyntaxTrees.*;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 public class TypeChecker {
     private TypeChecker() {}
@@ -91,5 +85,15 @@ public class TypeChecker {
         if (src == TypeKind.DOUBLE)
             return explicit && (dst == TypeKind.INT || dst == TypeKind.LONG || dst == TypeKind.FLOAT || dst == TypeKind.CHAR);
         return false;
+    }
+
+    // check if src implicitly casts to dst
+    public static boolean validCast(Signature src, Signature dst) {
+        if (src.size() != dst.size()) return false;
+        for (int i = 0; i < src.size(); ++i) {
+            if (!validCast(src.argTypes.get(i), dst.argTypes.get(i), false))
+                return false;
+        }
+        return true;
     }
 }

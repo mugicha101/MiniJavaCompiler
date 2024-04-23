@@ -6,12 +6,12 @@ import miniJava.CodeGeneration.x64.x64;
 public class Ret extends Instruction {
 	public Ret() {
 		// ret
-		opcodeBytes.write(0xc3); // TODO: what is the opcode for return with no size
+		opcodeBytes.write(0xc3);
 	}
 	
 	public Ret(short imm16, short mult) {
 		// ret imm16*mult
-		opcodeBytes.write(0xc2); // TODO: what is the opcode for return with some size
+		opcodeBytes.write(0xc2);
 		x64.writeShort(immBytes,imm16*mult);
 	}
 	

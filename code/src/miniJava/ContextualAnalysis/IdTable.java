@@ -3,16 +3,14 @@ package miniJava.ContextualAnalysis;
 import miniJava.AbstractSyntaxTrees.*;
 import miniJava.SyntacticAnalyzer.SourcePosition;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Stack;
+import java.util.*;
 
 public class IdTable {
     private static class MemberIdTable {
         public final ClassDecl classDecl;
         public final HashMap<String, FieldDecl> fieldIdTable = new HashMap<>();
-        public final HashMap<String, MethodDecl> methodIdTable = new HashMap<>();
+        public final HashMap<String, SigGroup> methodIdTable = new HashMap<>();
+        public final List<SigGroup> sigGroups = new ArrayList<>();
 
         MemberIdTable(ClassDecl classDecl) {
             this.classDecl = classDecl;
@@ -52,8 +50,8 @@ public class IdTable {
         }
     }
 
-    private HashMap<String, MemberIdTable> classIdTable = new HashMap<>();
-    private final HashMap<String, DeclScopeHandler> idTable = new HashMap<>();
+    private final Map<String, MemberIdTable> classIdTable = new HashMap<>();
+    private final Map<String, DeclScopeHandler> idTable = new HashMap<>();
     private final Stack<List<String>> idStack = new Stack<>();
     private int scopeLevel = 0;
 
@@ -101,10 +99,17 @@ public class IdTable {
     }
 
     private void addMethodDecl(String className, MethodDecl decl) {
-        HashMap<String, MethodDecl> methodIdTable = classIdTable.get(className).methodIdTable;
-        if (methodIdTable.containsKey(decl.name))
-            throw new MatcherError(decl.posn, String.format("Multiple definitions for method %s.%s", className, decl.name));
-        methodIdTable.put(decl.name, decl);
+        MemberIdTable memberIdTable = classIdTable.get(className);
+        Map<String, SigGroup> methodIdTable = memberIdTable.methodIdTable;
+        if (!methodIdTable.containsKey(decl.name)) {
+            SigGroup sigGroup = new SigGroup(decl.name, decl.parent);
+            methodIdTable.put(decl.name, sigGroup);
+            memberIdTable.sigGroups.add(sigGroup);
+        }
+        SigGroup sigGroup = methodIdTable.get(decl.name);
+        if (sigGroup.sigs.contains(decl.signature))
+            throw new MatcherError(decl.posn, String.format("Multiple definitions for method %s.%s", className, decl.signature));
+        sigGroup.add(decl.signature);
     }
 
     public Declaration getScopedDecl(SourcePosition posn, String name) {
@@ -116,6 +121,7 @@ public class IdTable {
         return handler.getLast();
     }
 
+    // returns type FieldDecl if member is a field decl and type SigGroupDecl if member is a method decl
     public MemberDecl getClassMember(SourcePosition posn, String className, String memberName) {
         if (!classIdTable.containsKey(className))
             throw new MatcherError(posn, String.format("Undeclared class %s", className));
@@ -142,13 +148,19 @@ public class IdTable {
         return memberIdTable.fieldIdTable.get(fieldName);
     }
 
-    public MethodDecl getMethodDecl(SourcePosition posn, String className, String methodName) {
+    public SigGroup getMethodSignatures(SourcePosition posn, String className, String methodName) {
         if (!classIdTable.containsKey(className))
             throw new MatcherError(posn, String.format("Undeclared class %s", className));
         MemberIdTable memberIdTable = classIdTable.get(className);
         if (!memberIdTable.methodIdTable.containsKey(methodName))
             throw new MatcherError(posn, String.format("Undeclared method %s.%s", className, methodName));
         return memberIdTable.methodIdTable.get(methodName);
+    }
+
+    public List<SigGroup> getClassSigGroups(SourcePosition posn, String className) {
+        if (!classIdTable.containsKey(className))
+            throw new MatcherError(posn, String.format("Undeclared class %s", className));
+        return classIdTable.get(className).sigGroups;
     }
 
     // lock/unlock var decl methods assume variable already added to scope

@@ -141,7 +141,7 @@ public class Codifier implements Visitor<Object, Object> {
             for (ClassDecl classDecl : prog.classDeclList) {
                 for (MethodDecl methodDecl : classDecl.methodDeclList) {
                     // skip non main methods
-                    if (!(methodDecl.name.equals("main")
+                    if (!(methodDecl.name.equals("main(String[])")
                             && methodDecl.isStatic
                             && !methodDecl.isPrivate
                             && methodDecl.type.typeKind == TypeKind.VOID
@@ -859,7 +859,7 @@ public class Codifier implements Visitor<Object, Object> {
             }
             instr(new Mov_rrm(new ModRMSIB(Reg64.RAX, 0, Reg64.RAX)));
         } else {
-            throw new CodeGenerationError(String.format("unknown declaration subclass for ref %s", ref.decl.name));
+            throw new RuntimeException(String.format("unknown declaration subclass for ref %s", ref.decl.name));
         }
 
         // push ref address onto stack
