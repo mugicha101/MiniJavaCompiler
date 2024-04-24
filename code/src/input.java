@@ -1,3 +1,90 @@
+/*
+class MainClass {
+    public static void pass(boolean cond) {
+        if (cond) {
+            System.out.println('p');
+            System.out.println('a');
+            System.out.println('s');
+            System.out.println('s');
+            System.out.println('\n');
+        } else {
+            System.out.println('f');
+            System.out.println('a');
+            System.out.println('i');
+            System.out.println('l');
+            System.out.println('\n');
+        }
+    }
+    public static void main(String[] args) {
+        A aa = new A();
+        A ab = new B();
+        // pass(ab instanceof A);
+        // pass(ab instanceof B);
+        // pass(!(aa instanceof B));
+        B bb = (B)ab;
+        aa.foo();
+        ab.foo();
+        bb.foo();
+        bb.a();
+        aa.a();
+    }
+}
+
+class A {
+    public void foo() {
+        System.out.println('A');
+        System.out.println('\n');
+    }
+
+    public void a() {
+        System.out.println('a');
+        System.out.println('\n');
+    }
+}
+
+class B extends A {
+    public void foo() {
+        System.out.println('B');
+        System.out.println('\n');
+    }
+
+    public void b() {
+        System.out.println('b');
+        System.out.println('\n');
+    }
+}
+*/
+class MainClass {
+    static void test() {
+        System.out.println('t');
+        System.out.println('\n');
+    }
+    public static void main(String[] args) {
+        test();
+        Foo foo = new Foo();
+        foo.foo();
+        System.out.println('b');
+        System.out.println('\n');
+        Foo foo2 = new Bar();
+        foo2.foo();
+    }
+}
+
+class Foo {
+    void foo() {
+        System.out.println('A');
+        System.out.println('\n');
+    }
+}
+
+class Bar extends Foo {
+    void foo() {
+        System.out.println('B');
+        System.out.println('\n');
+    }
+}
+
+/*
 class MainClass {
     static int a;
     static int b;
@@ -68,6 +155,14 @@ class MainClass {
         System.out.println('\n');
     }
 }
+ */
+
+/*
+class Foo {
+    int x;
+    int y;
+}
+*/
 class NumPrint {
     private static void print(long x, long mod) {
         if (x == 0) {

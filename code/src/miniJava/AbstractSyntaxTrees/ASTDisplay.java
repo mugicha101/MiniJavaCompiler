@@ -330,9 +330,17 @@ public class ASTDisplay implements Visitor<String,Object> {
         expr.expr.visit(this, indent(arg));
         return null;
     }
-    
 
-	///////////////////////////////////////////////////////////////////////////////
+    @Override
+    public Object visitInstanceOfExpr(InstanceOfExpr expr, String arg) {
+        show(arg, expr);
+        expr.expr.visit(this, indent(arg));
+        expr.type.visit(this, indent(arg));
+        return null;
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////////
 	//
 	// REFERENCES
 	//
@@ -342,7 +350,13 @@ public class ASTDisplay implements Visitor<String,Object> {
     	show(arg,ref);
     	return null;
     }
-    
+
+    @Override
+    public Object visitSuperRef(SuperRef ref, String arg) {
+        show(arg, ref);
+        return null;
+    }
+
     public Object visitIdRef(IdRef ref, String arg) {
     	show(arg,ref);
     	ref.id.visit(this, indent(arg));

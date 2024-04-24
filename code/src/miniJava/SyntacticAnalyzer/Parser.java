@@ -164,7 +164,7 @@ public class Parser {
 		return astPackage;
 	}
 
-	// ClassDeclaration ::= class identifier { (FieldDeclaration|MethodDeclaration)* }
+	// ClassDeclaration ::= class id (extends id)? { (FieldDeclaration|MethodDeclaration)* }
 	// FieldDeclaration ::= Visibility Access Type id ;
 	// MethodDeclaration ::= Visibility Access (Type|void) id \( ParameterList? \) { Statement* }
 	// Visibility ::= (public|private)?
@@ -173,7 +173,12 @@ public class Parser {
 		ClassDecl classDecl = new ClassDecl("", new FieldDeclList(), new MethodDeclList(), currToken.getTokenPosition());
 		accept(TokenType.Class);
 		classDecl.name = currToken.getTokenText();
-		accept(TokenType.Identifier, TokenType.LCurly);
+		accept(TokenType.Identifier);
+		if (optionalAccept(TokenType.Extends)) {
+			classDecl.parent = new Identifier(currToken);
+			accept(TokenType.Identifier);
+		}
+		accept(TokenType.LCurly);
 		while (!currTokenMatches(TokenType.RCurly)) {
 			// either method or field
 			FieldDecl fieldDecl = new FieldDecl(false, false, null, null, currToken.getTokenPosition());
@@ -291,13 +296,15 @@ public class Parser {
 		throw new SyntaxError();
 	}
 
-	// Reference ::= id | this | Reference . id
+	// Reference ::= id | this | super | Reference . id
 	private Reference parseOptionalReference() throws SyntaxError {
 		Reference ref;
 		if (currTokenMatches(TokenType.Identifier))
 			ref = new IdRef(new Identifier(currToken), currToken.getTokenPosition());
 		else if (currTokenMatches(TokenType.This))
 			ref = new ThisRef(currToken.getTokenPosition());
+		else if (currTokenMatches(TokenType.Super))
+			ref = new SuperRef(currToken.getTokenPosition());
 		else return null;
 		nextToken();
 		while (optionalAccept(TokenType.Dot)) {
@@ -507,8 +514,10 @@ public class Parser {
 	//     | unop Expression
 	//     | Expression binop Expression
 	//     | \( Expression \)
+	//     | \( Type \) Expression
 	//     | num | true | false
-	//     | new ( id\(\) | int [ Expression ] | id [ Expression ] )
+	//     | new ( id\(\) | type [ Expression ] )
+	//     | Expression instanceof id
 	private Expression parseOptionalExpressionTerm() throws SyntaxError {
 		SourcePosition exprPos = currToken.getTokenPosition();
 		Token startToken = currToken;
@@ -662,6 +671,11 @@ public class Parser {
 				if (termChain.isEmpty()) return null;
 				errors.reportError(currToken.getLine(), currToken.getOffset(), String.format("Expected start of an expression following a binary operator, but got %s", currToken.getTokenText()));
 				throw new SyntaxError();
+			} else if (optionalAccept(TokenType.InstanceOf)) {
+				// Expression instanceof id
+				Token idToken = currToken;
+				accept(TokenType.Identifier);
+				term = new InstanceOfExpr(term, new ClassType(new Identifier(idToken), term.posn), term.posn);
 			}
 			Operator operator = parseOptionalBinOp();
 			if (operator == null) {

@@ -47,9 +47,11 @@ public interface Visitor<ArgType,ResultType> {
     public ResultType visitNewObjectExpr(NewObjectExpr expr, ArgType arg);
     public ResultType visitNewArrayExpr(NewArrayExpr expr, ArgType arg);
     public ResultType visitCastExpr(CastExpr expr, ArgType arg);
+    public ResultType visitInstanceOfExpr(InstanceOfExpr expr, ArgType arg);
     
   // References
     public ResultType visitThisRef(ThisRef ref, ArgType arg);
+    public ResultType visitSuperRef(SuperRef ref, ArgType arg);
     public ResultType visitIdRef(IdRef ref, ArgType arg);
     public ResultType visitQRef(QualRef ref, ArgType arg);
 

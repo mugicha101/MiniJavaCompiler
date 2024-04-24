@@ -43,6 +43,9 @@ public class Scanner {
 		keywords.put("true", TokenType.BooleanLiteral);
 		keywords.put("false", TokenType.BooleanLiteral);
 		keywords.put("null", TokenType.NullLiteral);
+		keywords.put("extends", TokenType.Extends);
+		keywords.put("super", TokenType.Super);
+		keywords.put("instanceof", TokenType.InstanceOf);
 	}
 	
 	public Scanner( InputStream in, ErrorReporter errors ) {

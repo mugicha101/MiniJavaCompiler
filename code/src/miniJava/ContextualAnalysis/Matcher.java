@@ -7,8 +7,7 @@ import miniJava.SyntacticAnalyzer.SourcePosition;
 import miniJava.SyntacticAnalyzer.Token;
 import miniJava.SyntacticAnalyzer.TokenType;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 // references return Declaration
 // identifiers return Declaration
@@ -32,6 +31,7 @@ public class Matcher implements Visitor<IdTable, Object> {
         ARR_LENGTH_DECL.memOffset = 0;
     }
     public ClassDecl activeClass;
+    public ClassDecl activeClassParent;
     public MethodDecl activeMethod;
     public final ErrorReporter errors;
     boolean staticActive;
@@ -65,7 +65,14 @@ public class Matcher implements Visitor<IdTable, Object> {
         return null;
     }
 
+    private ClassDecl objectClassDecl;
+
     void addPredefined(Package prog) {
+        // Object
+        {
+            objectClassDecl = new ClassDecl("Object", new FieldDeclList(), new MethodDeclList(), PREDEF_POSN);
+            prog.classDeclList.add(objectClassDecl);
+        }
         // System.out.println
         {
             ClassDecl SystemDecl = new ClassDecl("System", new FieldDeclList(), new MethodDeclList(), PREDEF_POSN);
@@ -93,6 +100,7 @@ public class Matcher implements Visitor<IdTable, Object> {
         } catch (MatcherError idErr) {
             errors.clear();
             errors.reportError(idErr.posn, idErr.getMessage());
+            throw idErr;
         }
     }
 
@@ -101,7 +109,12 @@ public class Matcher implements Visitor<IdTable, Object> {
         // add predefined objects
         addPredefined(prog);
 
+        // add to lvl 0 and 1 scopes and determine signatures
         for (ClassDecl classDecl : prog.classDeclList) {
+            // add class decl to id table
+            arg.addClassDecl(classDecl);
+            arg.addScopedDecl(classDecl);
+
             // assign parents to members
             for (MethodDecl method : classDecl.methodDeclList) {
                 method.parent = classDecl;
@@ -117,15 +130,100 @@ public class Matcher implements Visitor<IdTable, Object> {
                 }
             }
 
-            // add class and members to scoped id table
-            arg.addClassDecl(classDecl);
-            arg.addScopedDecl(classDecl);
-
             // update method name to signature name
             for (MethodDecl method : classDecl.methodDeclList) {
                 method.name = method.signature.toString();
             }
         }
+
+        // determine relationships of classes
+        for (ClassDecl classDecl : prog.classDeclList) {
+            if (classDecl == objectClassDecl) continue;
+            classDecl.parentDecl = arg.getClassDecl(classDecl.parent.posn, classDecl.parent.spelling);
+            classDecl.parentDecl.subclasses.add(classDecl);
+            System.out.printf("%s extends %s\n", classDecl.name, classDecl.parentDecl.name);
+        }
+        objectClassDecl.parentDecl = objectClassDecl;
+
+        // detect cycles (not traversable from Object)
+        int next = 0;
+        objectClassDecl.hierarchyDepth = 0;
+        prog.topoOrder.add(objectClassDecl);
+        while (next < prog.topoOrder.size()) {
+            ClassDecl classDecl = prog.topoOrder.get(next++);
+            for (ClassDecl subclassDecl : classDecl.subclasses) {
+                subclassDecl.hierarchyDepth = classDecl.hierarchyDepth + 1;
+                prog.topoOrder.add(subclassDecl);
+            }
+        }
+        for (ClassDecl classDecl : prog.classDeclList) {
+            if (classDecl.hierarchyDepth != -1) continue;
+            List<String> cycle = new ArrayList<>();
+            ClassDecl curr = classDecl;
+            cycle.add(classDecl.name);
+            while (curr.parentDecl != classDecl) {
+                cycle.add(curr.parentDecl.name);
+                curr = classDecl.parentDecl;
+            }
+            cycle.add(classDecl.name);
+            throw new MatcherError(classDecl.posn, String.format("Cyclical inheritance: %s", String.join(" extends ", cycle)));
+        }
+
+        // update classDecl.fieldDeclList and classDecl.methodDeclList to inherit parent fields
+        for (ClassDecl classDecl : prog.topoOrder) {
+            if (classDecl == objectClassDecl) continue;
+            ClassDecl parentDecl = classDecl.parentDecl;
+
+            // inherit and override methods
+            MethodDeclList updatedMethods = new MethodDeclList();
+            Map<String, MethodDecl> nonOverriderMethods = new HashMap<>();
+            for (int i = 0; i < classDecl.methodDeclList.size(); ++i) {
+                MethodDecl methodDecl = classDecl.methodDeclList.get(i);
+                nonOverriderMethods.put(methodDecl.name, methodDecl);
+            }
+            for (int i = 0; i < parentDecl.methodDeclList.size(); ++i) {
+                MethodDecl inherited = parentDecl.methodDeclList.get(i);
+                if (nonOverriderMethods.containsKey(inherited.name)) {
+                    // override parent method
+                    MethodDecl overrider = nonOverriderMethods.get(inherited.name);
+                    nonOverriderMethods.remove(inherited.name);
+                    updatedMethods.add(overrider);
+                } else {
+                    // inherit parent method
+                    updatedMethods.add(inherited);
+                }
+            }
+            for (int i = 0; i < classDecl.methodDeclList.size(); ++i) {
+                MethodDecl method = classDecl.methodDeclList.get(i);
+                if (!nonOverriderMethods.containsKey(method.name))
+                    continue;
+
+                // add method that doesn't override inherited method
+                updatedMethods.add(method);
+            }
+
+            // inherit fields (collisions checked during classdecl visit)
+            FieldDeclList updatedFields = new FieldDeclList();
+            for (int i = 0; i < parentDecl.fieldDeclList.size(); ++i) {
+                FieldDecl inherited = parentDecl.fieldDeclList.get(i);
+                updatedFields.add(inherited);
+            }
+            for (int i = 0; i < classDecl.fieldDeclList.size(); ++i) {
+                FieldDecl fieldDecl = classDecl.fieldDeclList.get(i);
+                updatedFields.add(fieldDecl);
+            }
+
+            // apply update
+            classDecl.methodDeclList = updatedMethods;
+            classDecl.fieldDeclList = updatedFields;
+        }
+
+        // add class members to id table
+        for (ClassDecl classDecl : prog.classDeclList) {
+            arg.addClassMembers(classDecl);
+        }
+
+        // visit class decls
         for (ClassDecl classDecl : prog.classDeclList)
             classDecl.visit(this, arg);
         return null;
@@ -137,9 +235,14 @@ public class Matcher implements Visitor<IdTable, Object> {
         arg.openScope();
 
         // add members to scope
-        for (FieldDecl fieldDecl : cd.fieldDeclList)
+        for (FieldDecl fieldDecl : cd.fieldDeclList) {
+            if (fieldDecl.isPrivate && fieldDecl.parent != cd)
+                continue; // skip private parent fields
             arg.addScopedDecl(fieldDecl); // field name --> method decl
+        }
         for (MethodDecl methodDecl : cd.methodDeclList) {
+            if (methodDecl.isPrivate && methodDecl.parent != cd)
+                continue; // skip private parent methods
             arg.addScopedDecl(methodDecl); // method signature string --> method decl
         }
         for (SigGroup sigGroup : arg.getClassSigGroups(cd.posn, cd.name)) {
@@ -229,7 +332,7 @@ public class Matcher implements Visitor<IdTable, Object> {
         arg.lockVarDecl(stmt.varDecl);
         TypeDenoter exprType = (TypeDenoter)stmt.initExp.visit(this, arg);
         arg.unlockVarDecl(stmt.varDecl);
-        if (!TypeChecker.typeMatches(exprType, declType) && TypeChecker.validCast(exprType, declType, false)) {
+        if (!TypeChecker.typeMatches(exprType, declType) && TypeChecker.validCast(arg, exprType, declType, false)) {
             stmt.initExp = new CastExpr(declType, stmt.initExp, stmt.posn);
             stmt.initExp.resultType = declType;
             exprType = declType;
@@ -255,7 +358,7 @@ public class Matcher implements Visitor<IdTable, Object> {
         TypeDenoter exprType = (TypeDenoter)stmt.val.visit(this, arg);
         Declaration refDecl = (Declaration)stmt.ref.visit(this, arg);
         checkIsTyped(refDecl.posn, refDecl);
-        if (!TypeChecker.typeMatches(exprType, refDecl.type) && TypeChecker.validCast(exprType, refDecl.type, false)) {
+        if (!TypeChecker.typeMatches(exprType, refDecl.type) && TypeChecker.validCast(arg, exprType, refDecl.type, false)) {
             stmt.val = new CastExpr(refDecl.type, stmt.val, stmt.posn);
             stmt.val.resultType = refDecl.type;
             exprType = refDecl.type;
@@ -278,7 +381,7 @@ public class Matcher implements Visitor<IdTable, Object> {
             return null;
         }
         TypeDenoter eltType = ((ArrayType) refDecl.type).eltType;
-        if (!TypeChecker.typeMatches(exprType, eltType) && TypeChecker.validCast(exprType, eltType, false)) {
+        if (!TypeChecker.typeMatches(exprType, eltType) && TypeChecker.validCast(arg, exprType, eltType, false)) {
             stmt.exp = new CastExpr(eltType, stmt.exp, stmt.posn);
             stmt.exp.resultType = eltType;
             exprType = eltType;
@@ -300,7 +403,7 @@ public class Matcher implements Visitor<IdTable, Object> {
     public Object visitReturnStmt(ReturnStmt stmt, IdTable arg) {
         TypeDenoter retType = stmt.returnExpr == null ? VOID_TYPE : (TypeDenoter)stmt.returnExpr.visit(this, arg);
         TypeDenoter mRetType = activeMethod.type;
-        if (!TypeChecker.typeMatches(retType, mRetType) && TypeChecker.validCast(retType, mRetType, false)) {
+        if (!TypeChecker.typeMatches(retType, mRetType) && TypeChecker.validCast(arg, retType, mRetType, false)) {
             stmt.returnExpr = new CastExpr(mRetType, stmt.returnExpr, stmt.returnExpr.posn);
             stmt.returnExpr.resultType = mRetType;
             retType = mRetType;
@@ -373,11 +476,11 @@ public class Matcher implements Visitor<IdTable, Object> {
         TypeDenoter leftType = (TypeDenoter)expr.left.visit(this, arg);
         TypeDenoter rightType = (TypeDenoter)expr.right.visit(this, arg);
         if (!TypeChecker.typeMatches(leftType, rightType)) {
-            if (TypeChecker.validCast(leftType, rightType, false)) {
+            if (TypeChecker.validCast(arg, leftType, rightType, false)) {
                 expr.left = new CastExpr(rightType, expr.left, expr.posn);
                 expr.left.resultType = rightType;
                 leftType = rightType;
-            } else if (TypeChecker.validCast(rightType, leftType, false)) {
+            } else if (TypeChecker.validCast(arg, rightType, leftType, false)) {
                 expr.right = new CastExpr(leftType, expr.right, expr.posn);
                 expr.right.resultType = leftType;
                 rightType = leftType;
@@ -450,7 +553,7 @@ public class Matcher implements Visitor<IdTable, Object> {
             if (callSig.equals(sig)) {
                 methodSig = sig;
                 break;
-            } else if (TypeChecker.validCast(callSig, sig))
+            } else if (TypeChecker.validCast(arg, callSig, sig))
                 castSigs.add(sig);
         }
         if (methodSig == null) {
@@ -521,6 +624,7 @@ public class Matcher implements Visitor<IdTable, Object> {
     @Override
     public Object visitNewObjectExpr(NewObjectExpr expr, IdTable arg) {
         ClassDecl decl = arg.getClassDecl(expr.posn, expr.classtype.className.spelling);
+        expr.decl = decl;
         return expr.resultType = decl.unsupported ? UNSUPPORTED_TYPE : expr.classtype;
     }
 
@@ -534,9 +638,29 @@ public class Matcher implements Visitor<IdTable, Object> {
     @Override
     public Object visitCastExpr(CastExpr expr, IdTable arg) {
         TypeDenoter srcType = (TypeDenoter)expr.expr.visit(this, arg);
-        if (!TypeChecker.validCast(expr.type, srcType, true))
+        if (!TypeChecker.validCast(arg, expr.type, srcType, true))
             errors.reportError(expr.posn, String.format("Cannot cast type %s to %s", TypeChecker.typeStr(srcType), TypeChecker.typeStr(expr.type)));
         return expr.resultType = expr.type;
+    }
+
+    @Override
+    public Object visitInstanceOfExpr(InstanceOfExpr expr, IdTable arg) {
+        TypeDenoter valType = (TypeDenoter)expr.expr.visit(this, arg);
+        expr.resultType = BOOLEAN_TYPE;
+
+        // ensure either expr type is descendant of type or vise versa
+        if (!(valType instanceof ClassType)) {
+            errors.reportError(expr.posn, String.format("Cannot use instanceof on non class type %s", TypeChecker.typeStr(valType)));
+            return BOOLEAN_TYPE;
+        }
+        ClassType valClassType = (ClassType)valType;
+        ClassDecl valClassDecl = arg.getClassDecl(valClassType.posn, valClassType.className.spelling);
+        ClassDecl typeClassDecl = arg.getClassDecl(valClassType.posn, expr.type.className.spelling);
+        if (!TypeChecker.ancestorOf(valClassDecl, typeClassDecl) && !TypeChecker.ancestorOf(typeClassDecl, valClassDecl)) {
+            errors.reportError(expr.posn, String.format("Cannot use instanceof on unrelated classes %s and %s", valClassDecl.name, typeClassDecl.name));
+        }
+
+        return BOOLEAN_TYPE;
     }
 
     @Override
@@ -544,6 +668,13 @@ public class Matcher implements Visitor<IdTable, Object> {
         if (staticActive)
             throw new MatcherError(ref.posn, "Cannot reference this in a static context");
         return ref.decl = new VarDecl(new ClassType(new Identifier(new Token(TokenType.Identifier, activeClass.name, PREDEF_POSN.line, PREDEF_POSN.offset)), PREDEF_POSN), "this", PREDEF_POSN);
+    }
+
+    @Override
+    public Object visitSuperRef(SuperRef ref, IdTable arg) {
+        if (staticActive)
+            throw new MatcherError(ref.posn, "Cannot reference super in a static context");
+        return ref.decl = new VarDecl(new ClassType(new Identifier(new Token(TokenType.Identifier, activeClass.parentDecl.name, PREDEF_POSN.line, PREDEF_POSN.offset)), PREDEF_POSN), "super", PREDEF_POSN);
     }
 
     @Override

@@ -16,7 +16,7 @@ package miniJava.SyntacticAnalyzer;
 public enum TokenType {
     If, Else, For, While, Do, Switch, // control flow
     Visibility, // visibility
-    Class, Static, This, Return, New, // other class/func tokens
+    Class, Static, This, Super, Extends, InstanceOf, Return, New, // other class/func tokens
     Identifier, // names
     Add, Minus, Multiply, Divide, // arithmetic operators (minus is both binary and unary depending on context)
     RelLT, RelGT, RelLEq, RelGEq, RelEq, RelNEq, // relational operators

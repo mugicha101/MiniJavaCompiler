@@ -85,13 +85,18 @@ public class IdTable {
         if (classIdTable.containsKey(decl.name))
             throw new MatcherError(decl.posn, String.format("Multiple definitions for class %s", decl.name));
         classIdTable.put(decl.name, new MemberIdTable(decl));
+    }
+
+    public void addClassMembers(ClassDecl decl) {
         for (FieldDecl fieldDecl : decl.fieldDeclList)
             addFieldDecl(decl.name, fieldDecl);
-        for (MethodDecl methodDecl : decl.methodDeclList)
+        for (MethodDecl methodDecl : decl.methodDeclList) {
             addMethodDecl(decl.name, methodDecl);
+        }
     }
 
     private void addFieldDecl(String className, FieldDecl decl) {
+        System.out.printf("FIELD: %s.%s\n", className, decl.name);
         HashMap<String, FieldDecl> fieldIdTable = classIdTable.get(className).fieldIdTable;
         if (fieldIdTable.containsKey(decl.name))
             throw new MatcherError(decl.posn, String.format("Multiple definitions for field %s.%s", className, decl.name));
@@ -99,14 +104,16 @@ public class IdTable {
     }
 
     private void addMethodDecl(String className, MethodDecl decl) {
+        System.out.printf("METHOD: %s.%s\n", className, decl.name);
+        String baseName = decl.name.substring(0, decl.name.indexOf('('));
         MemberIdTable memberIdTable = classIdTable.get(className);
         Map<String, SigGroup> methodIdTable = memberIdTable.methodIdTable;
-        if (!methodIdTable.containsKey(decl.name)) {
-            SigGroup sigGroup = new SigGroup(decl.name, decl.parent);
-            methodIdTable.put(decl.name, sigGroup);
+        if (!methodIdTable.containsKey(baseName)) {
+            SigGroup sigGroup = new SigGroup(baseName, decl.parent);
+            methodIdTable.put(baseName, sigGroup);
             memberIdTable.sigGroups.add(sigGroup);
         }
-        SigGroup sigGroup = methodIdTable.get(decl.name);
+        SigGroup sigGroup = methodIdTable.get(baseName);
         if (sigGroup.sigs.contains(decl.signature))
             throw new MatcherError(decl.posn, String.format("Multiple definitions for method %s.%s", className, decl.signature));
         sigGroup.add(decl.signature);

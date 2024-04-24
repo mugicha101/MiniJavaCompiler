@@ -12,6 +12,7 @@ public class SigGroup extends MemberDecl {
     public final Set<Signature> sigs = new HashSet<>();
     public final ClassDecl parent;
     public boolean lastRefStatic; // true if last reference was from static context
+    public ClassDecl lastContext; // context of last reference
 
     public SigGroup(String name, ClassDecl parent) {
         super(false, false, null, name, null);

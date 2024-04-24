@@ -10,3 +10,7 @@ add FloatLiteral, DoubleLiteral, LongLiteral, CharLiteral classes
 add CastExpr class extending Expression
 add resultType field to Expression
 add ForStmt class extending Statement
+add Signature field to MethodDecl
+add SigGroup class extending MemberDecl
+add InstanceOfExpr and SuperRef classes
+add parent, parentDecl, subclasses, and hierarchyDepth fields to ClassDecl

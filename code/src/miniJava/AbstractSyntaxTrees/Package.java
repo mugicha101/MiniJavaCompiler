@@ -7,6 +7,9 @@ package miniJava.AbstractSyntaxTrees;
 
 import miniJava.SyntacticAnalyzer.SourcePosition;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class Package extends AST {
 
   public Package(ClassDeclList cdl, SourcePosition posn) {
@@ -19,4 +22,5 @@ public class Package extends AST {
     }
 
     public ClassDeclList classDeclList;
+    public List<ClassDecl> topoOrder = new ArrayList<>(); // topologically sorted classes
 }

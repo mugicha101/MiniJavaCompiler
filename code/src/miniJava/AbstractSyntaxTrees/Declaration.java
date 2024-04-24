@@ -13,7 +13,7 @@ public abstract class Declaration extends AST {
 	// for nonstatic field decl, is offset from object address
 	// for class decl, is address of class (and all its static fields) on stack relative to base at r15
 	// for var decl, is address on stack relative to rbp
-	// method decl does not use
+	// for method decl, is offset within virtual method table
 	public long memOffset = Long.MAX_VALUE;
 	
 	public Declaration(String name, TypeDenoter type, SourcePosition posn) {

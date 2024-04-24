@@ -19,4 +19,5 @@ public class NewObjectExpr extends NewExpr
     }
     
     public ClassType classtype;
+    public ClassDecl decl;
 }

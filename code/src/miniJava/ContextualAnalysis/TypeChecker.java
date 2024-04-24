@@ -51,47 +51,51 @@ public class TypeChecker {
         return false;
     }
 
-    public static boolean validCast(TypeDenoter srcType, TypeDenoter castType, boolean explicit) {
+    // checks if b is a subclass of a
+    // note: a is counted as a subclass of itself
+    public static boolean ancestorOf(ClassDecl a, ClassDecl b) {
+        if (a.name.equals(b.name)) return true;
+        if (a.hierarchyDepth > b.hierarchyDepth) return false;
+        while (b.hierarchyDepth > a.hierarchyDepth)
+            b = b.parentDecl;
+        return a.name.equals(b.name);
+    }
+
+    public static boolean validCast(IdTable idTable, TypeDenoter srcType, TypeDenoter castType, boolean explicit) {
         if (srcType == null || castType == null)
             return false;
 
-        if (srcType instanceof ClassType) {
-            // TODO: class casting (when inheritance is supported)
-            return false;
-        }
-
-        if (castType instanceof ClassType) {
-            // TODO: wrapper class casts
-            return false;
-        }
-
-        // arrays cannot be used in casts
-        if (srcType instanceof ArrayType || castType instanceof  ArrayType) {
-            return false;
+        // cast class types
+        if (srcType instanceof ClassType && castType instanceof ClassType) {
+            ClassDecl src = idTable.getClassDecl(srcType.posn, ((ClassType)srcType).className.spelling);
+            ClassDecl dst = idTable.getClassDecl(castType.posn, ((ClassType)castType).className.spelling);
+            return ancestorOf(dst, src) || (explicit && ancestorOf(src, dst));
         }
 
         // cast base types
-        TypeKind src = srcType.typeKind;
-        TypeKind dst = castType.typeKind;
-        if (src == dst) return true;
-        if (src == TypeKind.CHAR)
-            return dst == TypeKind.INT || dst == TypeKind.LONG || (explicit && (dst == TypeKind.FLOAT || dst == TypeKind.DOUBLE));
-        if (src == TypeKind.INT)
-            return dst == TypeKind.LONG || (explicit && (dst == TypeKind.FLOAT || dst == TypeKind.DOUBLE || dst == TypeKind.CHAR));
-        if (src == TypeKind.LONG)
-            return explicit && (dst == TypeKind.INT || dst == TypeKind.FLOAT || dst == TypeKind.DOUBLE || dst == TypeKind.CHAR);
-        if (src == TypeKind.FLOAT)
-            return dst == TypeKind.DOUBLE || (explicit && (dst == TypeKind.INT || dst == TypeKind.LONG || dst == TypeKind.CHAR));
-        if (src == TypeKind.DOUBLE)
-            return explicit && (dst == TypeKind.INT || dst == TypeKind.LONG || dst == TypeKind.FLOAT || dst == TypeKind.CHAR);
+        if (srcType instanceof BaseType && castType instanceof BaseType) {
+            TypeKind src = srcType.typeKind;
+            TypeKind dst = castType.typeKind;
+            if (src == dst) return true;
+            if (src == TypeKind.CHAR)
+                return dst == TypeKind.INT || dst == TypeKind.LONG || (explicit && (dst == TypeKind.FLOAT || dst == TypeKind.DOUBLE));
+            if (src == TypeKind.INT)
+                return dst == TypeKind.LONG || (explicit && (dst == TypeKind.FLOAT || dst == TypeKind.DOUBLE || dst == TypeKind.CHAR));
+            if (src == TypeKind.LONG)
+                return explicit && (dst == TypeKind.INT || dst == TypeKind.FLOAT || dst == TypeKind.DOUBLE || dst == TypeKind.CHAR);
+            if (src == TypeKind.FLOAT)
+                return dst == TypeKind.DOUBLE || (explicit && (dst == TypeKind.INT || dst == TypeKind.LONG || dst == TypeKind.CHAR));
+            if (src == TypeKind.DOUBLE)
+                return explicit && (dst == TypeKind.INT || dst == TypeKind.LONG || dst == TypeKind.FLOAT || dst == TypeKind.CHAR);
+        }
         return false;
     }
 
     // check if src implicitly casts to dst
-    public static boolean validCast(Signature src, Signature dst) {
+    public static boolean validCast(IdTable idTable, Signature src, Signature dst) {
         if (src.size() != dst.size()) return false;
         for (int i = 0; i < src.size(); ++i) {
-            if (!validCast(src.argTypes.get(i), dst.argTypes.get(i), false))
+            if (!validCast(idTable, src.argTypes.get(i), dst.argTypes.get(i), false))
                 return false;
         }
         return true;

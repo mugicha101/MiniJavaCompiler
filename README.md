@@ -32,7 +32,7 @@ X? - Optional
 | Production                                                                                            | AST Class Name    |
 |:------------------------------------------------------------------------------------------------------|:------------------|
 | Program ::= ClassDeclaration* `{End of File}`                                                         | Package           |
-| ClassDeclaration ::= `class` Id `{`(FieldDeclaration \| MethodDeclaration)* `}`                       | ClassDecl         |
+| ClassDeclaration ::= `class` Id (`extends` Id)? {`(FieldDeclaration \| MethodDeclaration)* `}`        | ClassDecl         |
 | FieldDeclaration ::= Visibility Access Type Id `;`                                                    | FieldDecl         |
 | MethodDeclaration ::= Visibility Access (Type \| `void`) Id `(` ParameterList? `)` `{` Statement* `}` | MethodDecl        |
 | Visibility ::= (`public` \| `private`)?                                                               | n/a               |
@@ -44,6 +44,7 @@ X? - Optional
 | Reference ::= `id`                                                                                    | IdRef             |
 | Reference ::= `this`                                                                                  | ThisRef           |
 | Reference ::= Reference `.` Id                                                                        | QualRef           |
+| Reference ::= `super`                                                                                 | SuperRef          |
 | Statement ::= `{` Statement* `}`                                                                      | BlockStmt         |
 | Statement ::= `if` `(` Expression `)` Statement (`else` Statement)?                                   | IfStmt            |
 | Statement ::= `while` `(` Expression `)` Statement                                                    | WhileStmt         |
@@ -64,6 +65,7 @@ X? - Optional
 | Expression ::= `{value or null or char}`                                                              | LiteralExpr       |
 | Expression ::= `new` Id `()`                                                                          | NewObjectExpr     |
 | Expression ::= `new` (BaseType \| Id) `[` Expression `]`                                              | NewArrayExpr      |
+| Expression ::= Expression `instanceof` Id                                                             | InstanceOfExpr    |
 | BaseType ::=  `int` \| `long` \| `boolean` \| `char` \| `float` \| `double`                           | BaseType          |
 | UnOp ::= `-` \| `!`                                                                                   | Operator          |
 | BinOp ::= `+` \| `-` \| `*` \| `/` \| `&&` \| `\|\|` \|                                               | Operator          |
