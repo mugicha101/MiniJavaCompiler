@@ -20,4 +20,5 @@ public class CastExpr extends Expression {
 
   public TypeDenoter type;
   public Expression expr;
+  public ClassDecl typeDecl; // null if type not class type
 }

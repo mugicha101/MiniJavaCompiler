@@ -336,6 +336,7 @@ public class Matcher implements Visitor<IdTable, Object> {
             stmt.initExp = new CastExpr(declType, stmt.initExp, stmt.posn);
             stmt.initExp.resultType = declType;
             exprType = declType;
+            setCastTypeDecl(stmt.initExp, arg);
         }
         checkTypeMatch("variable declaration", stmt.posn, exprType, declType);
         return null;
@@ -362,6 +363,7 @@ public class Matcher implements Visitor<IdTable, Object> {
             stmt.val = new CastExpr(refDecl.type, stmt.val, stmt.posn);
             stmt.val.resultType = refDecl.type;
             exprType = refDecl.type;
+            setCastTypeDecl(stmt.val, arg);
         }
         checkTypeMatch("assign statement", stmt.posn, exprType, refDecl.type);
         if (refDecl.specialTag != null && refDecl.specialTag.equals("array.length")) {
@@ -385,6 +387,7 @@ public class Matcher implements Visitor<IdTable, Object> {
             stmt.exp = new CastExpr(eltType, stmt.exp, stmt.posn);
             stmt.exp.resultType = eltType;
             exprType = eltType;
+            setCastTypeDecl(stmt.exp, arg);
         }
         checkTypeMatch("array element assignment", stmt.posn, exprType, eltType);
         return null;
@@ -407,6 +410,7 @@ public class Matcher implements Visitor<IdTable, Object> {
             stmt.returnExpr = new CastExpr(mRetType, stmt.returnExpr, stmt.returnExpr.posn);
             stmt.returnExpr.resultType = mRetType;
             retType = mRetType;
+            setCastTypeDecl(stmt.returnExpr, arg);
         }
         checkTypeMatch(String.format("method %s.%s return statement", activeClass.name, activeMethod.name), stmt.posn, retType, mRetType);
         return retType;
@@ -480,10 +484,12 @@ public class Matcher implements Visitor<IdTable, Object> {
                 expr.left = new CastExpr(rightType, expr.left, expr.posn);
                 expr.left.resultType = rightType;
                 leftType = rightType;
+                setCastTypeDecl(expr.left, arg);
             } else if (TypeChecker.validCast(arg, rightType, leftType, false)) {
                 expr.right = new CastExpr(leftType, expr.right, expr.posn);
                 expr.right.resultType = leftType;
                 rightType = leftType;
+                setCastTypeDecl(expr.right, arg);
             }
         }
         String ctmContext = String.format(" side of %s binary expression", expr.operator.kind.toString().toLowerCase());
@@ -598,6 +604,7 @@ public class Matcher implements Visitor<IdTable, Object> {
                 argList.set(i, new CastExpr(pd.type, argExpr, argExpr.posn));
                 argExpr = argList.get(i);
                 argExpr.resultType = pd.type;
+                setCastTypeDecl(argExpr, arg);
             }
         }
 
@@ -635,11 +642,21 @@ public class Matcher implements Visitor<IdTable, Object> {
         return expr.resultType = new ArrayType(expr.eltType, expr.posn);
     }
 
+    private void setCastTypeDecl(Expression expr, IdTable arg) {
+        CastExpr cast = (CastExpr)expr;
+        if (cast.type instanceof BaseType) {
+            cast.typeDecl = null;
+            return;
+        }
+        cast.typeDecl = arg.getClassDecl(cast.posn, ((ClassType)cast.type).className.spelling);
+    }
+
     @Override
     public Object visitCastExpr(CastExpr expr, IdTable arg) {
         TypeDenoter srcType = (TypeDenoter)expr.expr.visit(this, arg);
         if (!TypeChecker.validCast(arg, expr.type, srcType, true))
             errors.reportError(expr.posn, String.format("Cannot cast type %s to %s", TypeChecker.typeStr(srcType), TypeChecker.typeStr(expr.type)));
+        setCastTypeDecl(expr, arg);
         return expr.resultType = expr.type;
     }
 
@@ -659,6 +676,7 @@ public class Matcher implements Visitor<IdTable, Object> {
         if (!TypeChecker.ancestorOf(valClassDecl, typeClassDecl) && !TypeChecker.ancestorOf(typeClassDecl, valClassDecl)) {
             errors.reportError(expr.posn, String.format("Cannot use instanceof on unrelated classes %s and %s", valClassDecl.name, typeClassDecl.name));
         }
+        expr.typeDecl = typeClassDecl;
 
         return BOOLEAN_TYPE;
     }

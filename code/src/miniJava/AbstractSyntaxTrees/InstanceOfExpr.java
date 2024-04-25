@@ -9,6 +9,7 @@ import miniJava.SyntacticAnalyzer.SourcePosition;
 
 public class InstanceOfExpr extends Expression
 {
+    public ClassDecl typeDecl;
     public InstanceOfExpr(Expression expr, ClassType type, SourcePosition posn){
         super(posn);
         this.expr = expr;

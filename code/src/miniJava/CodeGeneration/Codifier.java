@@ -92,14 +92,27 @@ public class Codifier implements Visitor<Object, Object> {
 
     private MethodDecl printAddrDecl = null;
     // prints address stored in R15
+    // calls NumPrint.print(val,16) directly
     private void debugPrint() {
         if (printAddrDecl == null) return;
+        instr(new Push(Reg64.RAX));
+        instr(new Push(Reg64.RCX));
+        instr(new Push(Reg64.RDX));
+        instr(new Push(Reg64.RDI));
+        instr(new Push(Reg64.RSI));
+        instr(new Push(Reg64.R14));
         instr(new Mov_ri64(Reg64.R14, 16));
         instr(new Push(Reg64.R14));
         instr(new Push(Reg64.R15));
         addUnresolved(instr(new Call(0, 0)), printAddrDecl);
         instr(new Pop(Reg64.R15));
         instr(new Pop(Reg64.R14));
+        instr(new Pop(Reg64.R14));
+        instr(new Pop(Reg64.RSI));
+        instr(new Pop(Reg64.RDI));
+        instr(new Pop(Reg64.RDX));
+        instr(new Pop(Reg64.RCX));
+        instr(new Pop(Reg64.RAX));
     }
 
     private void addUnresolved(int idx, Object target) {
@@ -202,17 +215,16 @@ public class Codifier implements Visitor<Object, Object> {
             // add 16 bytes of padding (where the stack base and text base is stored, entry point is after this padding)
             instr(new CustomInstruction(new byte[]{}, (long) 0));
             instr(new CustomInstruction(new byte[]{}, (long) 0));
-            // store stack base instruction: mov [rip-16],rsp
-            instr(new CustomInstruction(
-                    new byte[]{(byte) 0x48, (byte) 0x89, (byte) 0x25},
-                    new byte[]{(byte) 0xf0, (byte) 0xff, (byte) 0xff, (byte) 0xff}
-            ));
+            // store stack base
+            setTextVal(Reg64.RSP, 0);
 
             // get text base: lea rax,[rip]
             instr(new CustomInstruction(
                     new byte[]{(byte) 0x48, (byte) 0x8d, (byte) 0x05},
                     new byte[]{(byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00}
             ));
+            instr(new Sub(new ModRMSIB(Reg64.RAX, true), asm.getSize()));
+            // store text base
             setTextVal(Reg64.RAX, 8);
 
             // resolve fields (add statics below main stackframe)
@@ -220,7 +232,7 @@ public class Codifier implements Visitor<Object, Object> {
             instr(new Xor(new ModRMSIB(Reg64.RAX, Reg64.RAX)));
             for (ClassDecl classDecl : prog.classDeclList) {
                 classDecl.memOffset = stackBaseOffset;
-                long classMemOffset = 8; // first 8 bytes is VMT
+                long classMemOffset = 8; // first 8 bytes is VMT addr
                 for (FieldDecl fieldDecl : classDecl.fieldDeclList) {
                     if (fieldDecl.isStatic) {
                         // static field (relative to stack base)
@@ -242,25 +254,28 @@ public class Codifier implements Visitor<Object, Object> {
             // mark mov instructs as unresolved
             ClassDecl sysDecl = null;
             ClassDecl psDecl = null;
+            loadTextBase(Reg64.RCX);
             for (ClassDecl classDecl : prog.topoOrder) {
                 System.out.printf("Push %s VMT: %x\n", classDecl.name, 0x1b0 + asm.getSize());
                 // ith method decl refers to ith VMT element
                 for (int i = classDecl.methodDeclList.size()-1; i >= 0; --i) {
                     MethodDecl methodDecl = classDecl.methodDeclList.get(i);
                     addUnresolved(instr(new Mov_ri64(Reg64.RAX, 0)), methodDecl); // resolve address of method later
+                    instr(new Add(new ModRMSIB(Reg64.RAX, Reg64.RCX)));
                     instr(new Push(Reg64.RAX));
                     methodDecl.memOffset = i * 8L + 8L; // offset in VMT
                     stackBaseOffset -= 8;
                 }
                 // add pointer to parent VMT at start
                 stackBaseOffset -= 8;
+                loadStackBase(Reg64.RAX);
                 if (classDecl.parentDecl == classDecl) {
                     // special case for Object class
-                    instr(new Mov_ri64(Reg64.RAX, stackBaseOffset));
+                    instr(new Add(new ModRMSIB(Reg64.RAX, true), (int)stackBaseOffset));
                     instr(new Push(Reg64.RAX));
                 } else {
                     // all other classes have parent VMTs pushed first
-                    instr(new Mov_ri64(Reg64.RAX, classDecl.parentDecl.vmtOffset));
+                    instr(new Add(new ModRMSIB(Reg64.RAX, true), (int)classDecl.parentDecl.vmtOffset));
                     instr(new Push(Reg64.RAX));
                 }
                 classDecl.vmtOffset = stackBaseOffset;
@@ -278,24 +293,13 @@ public class Codifier implements Visitor<Object, Object> {
             instr(new Pop(Reg64.RCX));
             instr(new Mov_rmr(new ModRMSIB(Reg64.RAX, 0, Reg64.RCX)));
             instr(new Mov_rrm(new ModRMSIB(Reg64.RCX, 0, Reg64.R15)));
-            /*
-            loadStackBase(Reg64.RAX);
-            instr(new Sub(new ModRMSIB(Reg64.R15, Reg64.RAX)));
-            debugPrint();
-             */
 
             // add debug print 727
             instr(new Mov_ri64(Reg64.R15, 0x727));
             debugPrint();
             loadStackBase(Reg64.R15);
             debugPrint();
-            loadTextBase(Reg64.R8);
-            instr(new Lea(new ModRMSIB(Reg64.R8, asm.getSize(), Reg64.R8)));
-            instr(new Push(Reg64.R8));
-            instr(new Call(0));
-            instr(new Pop(Reg64.R15));
-            debugPrint();
-            instr(new Pop(Reg64.R15));
+            loadTextBase(Reg64.R15);
             debugPrint();
 
             // add call to main (copy arg passed into main to top of stack)
@@ -591,33 +595,20 @@ public class Codifier implements Visitor<Object, Object> {
             argList.get(i).visit(this, null);
         }
 
-        if (((MethodDecl)methodRef.decl).isStatic || !methodRef.decl.name.equals("foo()")) {
+        if (((MethodDecl)methodRef.decl).isStatic) {
+            // static call
             addUnresolved(instr(new Call(0, 0)), methodRef.decl);
         } else {
-            // addUnresolved(instr(new Call(0, 0)), methodRef.decl);
+            // virtual call
             // get address of call from VMT
             // mov RDI,[RSP+argBytes-8] - move address of current obj into RDI
             instr(new Mov_rrm(new ModRMSIB(Reg64.RSP, argBytes-0x8, Reg64.RDI)));
-            if (methodRef.decl.name.equals("foo()")) {
-                instr(new Mov_rmr(new ModRMSIB(Reg64.R8, Reg64.RDI)));
-            }
             // mov RDI,[RDI] - dereference current object to get VMT address
             instr(new Mov_rrm(new ModRMSIB(Reg64.RDI, 0, Reg64.RDI)));
-            if (methodRef.decl.name.equals("foo()")) {
-                instr(new Mov_rmr(new ModRMSIB(Reg64.R9, Reg64.RDI)));
-            }
             // mov RDI,[RDI+method.memOffset] - get correct entry of VMT and mov call addr to RDI
             instr(new Mov_rrm(new ModRMSIB(Reg64.RDI, (int) methodRef.decl.memOffset, Reg64.RDI)));
-            // offset call addr by text base
-            loadTextBase(Reg64.RAX);
-            instr(new Add(new ModRMSIB(Reg64.RDI, Reg64.RAX)));
             // call
-            instr(new Sub(new ModRMSIB(Reg64.RDI, true), 0x1E));
-            // instr(new Mov_rmr(new ModRMSIB(Reg64.R15, Reg64.RDI)));
-            // debugPrint();
             instr(new Call(new ModRMSIB(Reg64.RDI, true)));
-            // instr(new Mov_ri64(Reg64.R15, 1234));
-            // debugPrint();
         }
         if (argBytes > 0) instr(new Add(new ModRMSIB(Reg64.RSP, true), argBytes));
     }
@@ -835,6 +826,12 @@ public class Codifier implements Visitor<Object, Object> {
         return null;
     }
 
+    // loads vmt addr of class decl into reg
+    private void loadVmtAddr(Reg64 reg, ClassDecl decl) {
+        loadStackBase(reg);
+        instr(new Lea(new ModRMSIB(reg, (int)decl.vmtOffset, reg)));
+    }
+
     // creates instance of class defined by decl and pushes address onto stack
     // clobbers RAX and RCX
     private void createObject(ClassDecl decl) {
@@ -842,26 +839,9 @@ public class Codifier implements Visitor<Object, Object> {
         addMalloc();
         instr(new Push(Reg64.RAX));
         // get pointer to VMT address
-        loadStackBase(Reg64.RCX);
-        instr(new Lea(new ModRMSIB(Reg64.RCX, (int)decl.vmtOffset, Reg64.RCX)));
+        loadVmtAddr(Reg64.RCX, decl);
         // set first 8 bytes of class to VMT address
         instr(new Mov_rmr(new ModRMSIB(Reg64.RAX, 0, Reg64.RCX)));
-        if (false && decl.name.equals("Foo")) {
-            instr(new Mov_ri64(Reg64.R15, 0x1234));
-            debugPrint();
-            instr(new Pop(Reg64.RAX));
-            instr(new Push(Reg64.RAX));
-            instr(new Mov_rmr(new ModRMSIB(Reg64.R15, Reg64.RAX)));
-            debugPrint();
-            instr(new Pop(Reg64.RAX));
-            instr(new Push(Reg64.RAX));
-            instr(new Mov_rrm(new ModRMSIB(Reg64.RAX, 0, Reg64.RAX)));
-            instr(new Mov_rmr(new ModRMSIB(Reg64.R15, Reg64.RAX)));
-            debugPrint();
-            loadStackBase(Reg64.RAX);
-            instr(new Sub(new ModRMSIB(Reg64.R15, Reg64.RAX)));
-            debugPrint();
-        }
     }
 
     @Override
@@ -900,7 +880,20 @@ public class Codifier implements Visitor<Object, Object> {
 
         // perform cast on value in RAX
         if (expr.resultType instanceof ClassType) {
-            // TODO: check if typecast invalid
+            loadVmtAddr(Reg64.RCX, expr.typeDecl);
+            instr(new Mov_rmr(new ModRMSIB(Reg64.RBX, Reg64.RAX)));
+            addInstanceOf(Reg64.RBX, Reg64.RCX, Reg64.RDX);
+            instr(new Cmp(new ModRMSIB(Reg64.RDX, true), 1));
+            String skipExitLabel = "skipExitLabel " + genNonce();
+            addUnresolved(instr(new CondJmp(Condition.E, 0, 0, false)), skipExitLabel);
+            instr(new Mov_ri64(Reg64.RDX, 17));
+            instr(new Push(0x0000000A));
+            instr(new Push(0x52524520));
+            instr(new Push(0x54534143));
+            instr(new Mov_rmr(new ModRMSIB(Reg64.RSI, Reg64.RSP)));
+            addPrintln();
+            addExit();
+            addLabel(skipExitLabel);
             instr(new Push(Reg64.RAX));
             return null;
         }
@@ -980,9 +973,40 @@ public class Codifier implements Visitor<Object, Object> {
         return null;
     }
 
+    // checks if object at aAddr is an instance of VMT at vmtAddr
+    // clobbers both inputs and puts result into res
+    // boolean result put into res
+    private void addInstanceOf(Reg64 aAddr, Reg64 vmtAddr, Reg64 res) {
+        instr(new Mov_ri64(res, 0));
+        String iofSuccessLabel = "iofSuccessLabel " + genNonce();
+        String iofEndLabel = "iofEndLabel" + genNonce();
+        int loopTop = asm.getSize();
+        // top of loop
+        instr(new Mov_rrm(new ModRMSIB(aAddr, 0, aAddr))); // dereference aAddr to get VMT addr
+        // if matches, jump to success
+        instr(new Cmp(new ModRMSIB(aAddr, vmtAddr)));
+        addUnresolved(instr(new CondJmp(Condition.E, 0, 0, false)), iofSuccessLabel);
+        // if end of chain, jump to fail
+        instr(new Cmp(new ModRMSIB(aAddr, 0, aAddr)));
+        addUnresolved(instr(new CondJmp(Condition.E, 0, 0, false)), iofEndLabel);
+        // jump to top
+        instr(new Jmp(asm.getSize(), loopTop, false));
+        // success
+        addLabel(iofSuccessLabel);
+
+        instr(new Mov_ri64(res, 1L));
+        // end
+        addLabel(iofEndLabel);
+    }
+
     @Override
     public Object visitInstanceOfExpr(InstanceOfExpr expr, Object arg) {
-        throw new RuntimeException("visitInstanceOfExpr not implemented");
+        expr.expr.visit(this, arg);
+        loadVmtAddr(Reg64.RDX, expr.typeDecl);
+        instr(new Pop(Reg64.RCX));
+        addInstanceOf(Reg64.RCX, Reg64.RDX, Reg64.RAX);
+        instr(new Push(Reg64.RAX));
+        return null;
     }
 
     @Override

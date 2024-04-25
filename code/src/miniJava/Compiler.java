@@ -1,6 +1,7 @@
 package miniJava;
 
 import miniJava.AbstractSyntaxTrees.AST;
+import miniJava.AbstractSyntaxTrees.ASTDisplay;
 import miniJava.AbstractSyntaxTrees.Package;
 import miniJava.CodeGeneration.Codifier;
 import miniJava.ContextualAnalysis.Matcher;
@@ -25,9 +26,11 @@ public class Compiler {
 		Parser parser = new Parser(scanner, errors);
 		Package ast = (Package)parser.parse();
 		if (ast != null) {
+			ASTDisplay display = new ASTDisplay();
 			Matcher matcher = new Matcher(errors);
 			matcher.match(ast);
 			if (!errors.hasErrors()) {
+				display.showTree(ast);
 				Codifier codifier = new Codifier(errors);
 				codifier.parse(ast);
 			}

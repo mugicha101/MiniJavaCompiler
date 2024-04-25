@@ -1,4 +1,3 @@
-/*
 class MainClass {
     public static void pass(boolean cond) {
         if (cond) {
@@ -17,20 +16,40 @@ class MainClass {
     }
     public static void main(String[] args) {
         A aa = new A();
-        A ab = new B();
-        // pass(ab instanceof A);
-        // pass(ab instanceof B);
-        // pass(!(aa instanceof B));
-        B bb = (B)ab;
-        aa.foo();
-        ab.foo();
-        bb.foo();
-        bb.a();
-        aa.a();
+        A ab = new B(); // implicit type cast
+        pass(ab instanceof A); // is true
+        pass(ab instanceof B); // is true
+        pass(!(aa instanceof B)); // is false
+        B bb = (B)ab; // explicit type cast
+        aa.foo(); // prints A - normal method
+        ab.foo(); // prints B - virtual method
+        bb.foo(); // prints B - overrider method
+        aa.a(); // prints a - normal method
+        bb.a(); // prints a - inherited method
+        A.x = 1;
+        NumPrint.printd(B.x); // prints 1 - inherited static field access
+        A.st(); // prints S1 - normal static method
+        B.st(); // prints S2 - hiding static method
+        A.tt(); // prints T - normal static method
+        B.tt(); // prints T - inherited static method
     }
 }
 
 class A {
+    public char val;
+    public static int x;
+    public static void st() {
+        System.out.println('S');
+        System.out.println('1');
+        System.out.println('\n');
+    }
+
+
+    public static void tt() {
+        System.out.println('T');
+        System.out.println('\n');
+    }
+
     public void foo() {
         System.out.println('A');
         System.out.println('\n');
@@ -43,6 +62,12 @@ class A {
 }
 
 class B extends A {
+    public static int y;
+    public static void st() {
+        System.out.println('S');
+        System.out.println('2');
+        System.out.println('\n');
+    }
     public void foo() {
         System.out.println('B');
         System.out.println('\n');
@@ -50,36 +75,6 @@ class B extends A {
 
     public void b() {
         System.out.println('b');
-        System.out.println('\n');
-    }
-}
-*/
-class MainClass {
-    static void test() {
-        System.out.println('t');
-        System.out.println('\n');
-    }
-    public static void main(String[] args) {
-        test();
-        Foo foo = new Foo();
-        foo.foo();
-        System.out.println('b');
-        System.out.println('\n');
-        Foo foo2 = new Bar();
-        foo2.foo();
-    }
-}
-
-class Foo {
-    void foo() {
-        System.out.println('A');
-        System.out.println('\n');
-    }
-}
-
-class Bar extends Foo {
-    void foo() {
-        System.out.println('B');
         System.out.println('\n');
     }
 }
