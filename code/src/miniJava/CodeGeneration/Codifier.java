@@ -595,8 +595,8 @@ public class Codifier implements Visitor<Object, Object> {
             argList.get(i).visit(this, null);
         }
 
-        if (((MethodDecl)methodRef.decl).isStatic) {
-            // static call
+        if (((MethodDecl)methodRef.decl).lastRefDirectCall) {
+            // direct call
             addUnresolved(instr(new Call(0, 0)), methodRef.decl);
         } else {
             // virtual call
@@ -1011,6 +1011,7 @@ public class Codifier implements Visitor<Object, Object> {
 
     @Override
     public Object visitThisRef(ThisRef ref, Object arg) {
+        // pushes address of object + VTM address
         ref.asmOffset = asm.getSize();
         checkThisMemOffset();
         ref.decl.memOffset = thisMemOffset;
@@ -1021,7 +1022,7 @@ public class Codifier implements Visitor<Object, Object> {
 
     @Override
     public Object visitSuperRef(SuperRef ref, Object arg) {
-        // same as visitThisRef as super refers to same object just different types
+        // same as this, member decl resolved during identification
         ref.asmOffset = asm.getSize();
         checkThisMemOffset();
         ref.decl.memOffset = thisMemOffset;
@@ -1032,6 +1033,7 @@ public class Codifier implements Visitor<Object, Object> {
 
     // push ref address onto stack
     // for case of method decl, pushes context object if nonstatic and nothing otherwise
+    // for qualref with super as ref and method as id, directly accesses methods instead of looking at VMT
     // clobbers RAX and RSI
     void pushRefAddress(Reference ref) {
         // load ref address into rax
@@ -1044,7 +1046,8 @@ public class Codifier implements Visitor<Object, Object> {
                 instr(new Lea(new ModRMSIB(Reg64.RAX, (int) ref.decl.memOffset, Reg64.RAX)));
             } else {
                 if (ref instanceof QualRef) {
-                    ((QualRef)ref).ref.visit(this, null);
+                    QualRef qualRef = (QualRef)ref;
+                    qualRef.ref.visit(this, null);
                     instr(new Pop(Reg64.RSI));
                     instr(new Mov_rrm(new ModRMSIB(Reg64.RSI, 0, Reg64.RSI)));
                 } else {
@@ -1057,13 +1060,25 @@ public class Codifier implements Visitor<Object, Object> {
             instr(new Lea(new ModRMSIB(Reg64.RBP, (int) ref.decl.memOffset, Reg64.RAX)));
         } else if (ref.decl instanceof MethodDecl) {
             MethodDecl method = (MethodDecl)ref.decl;
-            if (method.isStatic) return; // push nothing
+            if (method.isStatic) {
+                method.lastRefDirectCall = true;
+                return; // push nothing since is static
+            }
 
-            // push 'this'
             if (ref instanceof QualRef) {
-                ((QualRef)ref).ref.visit(this, null);
-                instr(new Pop(Reg64.RAX));
+                QualRef qualRef = (QualRef)ref;
+                qualRef.ref.visit(this, null);
+                if (qualRef.ref instanceof SuperRef) {
+                    // is direct call
+                    method.lastRefDirectCall = true;
+                    return;
+                } else {
+                    // uses VMT
+                    method.lastRefDirectCall = false;
+                    instr(new Pop(Reg64.RAX));
+                }
             } else if (ref instanceof IdRef) {
+                // push 'this'
                 instr(new Lea(new ModRMSIB(Reg64.RBP, thisMemOffset, Reg64.RAX)));
             }
             instr(new Mov_rrm(new ModRMSIB(Reg64.RAX, 0, Reg64.RAX)));

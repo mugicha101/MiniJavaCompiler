@@ -10,6 +10,7 @@ import miniJava.SyntacticAnalyzer.SourcePosition;
 
 public class MethodDecl extends MemberDecl {
     public Signature signature;
+    public boolean lastRefDirectCall; // true if last reference is a direct call
 	public MethodDecl(MemberDecl md, ParameterDeclList pl, StatementList sl, SourcePosition posn){
         super(md,posn);
         parameterDeclList = pl;

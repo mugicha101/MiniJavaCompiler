@@ -17,9 +17,9 @@ class MainClass {
     public static void main(String[] args) {
         A aa = new A();
         A ab = new B(); // implicit type cast
-        pass(ab instanceof A); // is true
-        pass(ab instanceof B); // is true
-        pass(!(aa instanceof B)); // is false
+        pass(ab instanceof A); // prints pass - is true
+        pass(ab instanceof B); // prints pass - is true
+        pass(!(aa instanceof B)); // prints pass - is false
         B bb = (B)ab; // explicit type cast
         aa.foo(); // prints A - normal method
         ab.foo(); // prints B - virtual method
@@ -32,6 +32,7 @@ class MainClass {
         B.st(); // prints S2 - hiding static method
         A.tt(); // prints T - normal static method
         B.tt(); // prints T - inherited static method
+        bb.b(); // prints a \newline b - b() calls super.a() then prints 'b'
     }
 }
 
@@ -74,6 +75,7 @@ class B extends A {
     }
 
     public void b() {
+        super.a();
         System.out.println('b');
         System.out.println('\n');
     }
