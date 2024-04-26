@@ -94,7 +94,7 @@ public class Codifier implements Visitor<Object, Object> {
     // prints address stored in R15
     // calls NumPrint.print(val,16) directly
     private void debugPrint() {
-        if (printAddrDecl == null) return;
+        if (true || printAddrDecl == null) return;
         instr(new Push(Reg64.RAX));
         instr(new Push(Reg64.RCX));
         instr(new Push(Reg64.RDX));
@@ -238,7 +238,7 @@ public class Codifier implements Visitor<Object, Object> {
                         // static field (relative to stack base)
                         stackBaseOffset -= 8;
                         fieldDecl.memOffset = stackBaseOffset;
-                        instr(new Push(Reg64.RAX));
+                        instr(new Push(0));
                     } else {
                         // nonstatic field (relative to obj heap addr)
                         fieldDecl.memOffset = classMemOffset;
@@ -309,6 +309,7 @@ public class Codifier implements Visitor<Object, Object> {
             addUnresolved(instr(new Call(0, 0)), mainMethod);
 
             // exit
+            instr(new Xor(new ModRMSIB(Reg64.RDI, Reg64.RDI)));
             addExit();
 
             // main code generation
@@ -393,9 +394,9 @@ public class Codifier implements Visitor<Object, Object> {
         instr(new Syscall());
     }
 
+    // error code in RDI
     private void addExit() {
         instr(new Mov_rmi(new ModRMSIB(Reg64.RAX, true), 60));
-        instr(new Xor(new ModRMSIB(Reg64.RDI, Reg64.RDI)));
         instr(new Syscall());
     }
 
@@ -566,16 +567,31 @@ public class Codifier implements Visitor<Object, Object> {
         return null;
     }
 
-    // load address of array element into register reg (can't be RCX)
-    // clobbers RCX
+    // load address of array element into register reg (can't be RCX or RDX)
+    // clobbers RCX, RDX
     private void loadArrayElement(Reference arrRef, Expression ixExpr, Reg64 reg) {
-        if (reg == Reg64.RCX) throw new IllegalArgumentException("loadArrayElement reg cannot be RCX");
+        if (reg == Reg64.RCX || reg == Reg64.RDX) throw new IllegalArgumentException("loadArrayElement reg cannot be RCX");
         arrRef.visit(this, null);
         ixExpr.visit(this, null);
-        instr(new Pop(Reg64.RCX));
+        instr(new Pop(Reg64.RCX)); // RCX: index
         instr(new Pop(reg));
-        instr(new Mov_rrm(new ModRMSIB(reg, 0, reg)));
+        instr(new Mov_rrm(new ModRMSIB(reg, 0, reg))); // reg: arr addr
+        instr(new Mov_rrm(new ModRMSIB(reg, 0, Reg64.RDX))); // rdx: arr length
+
+        // out of index error if index < 0 or index >= len
+        String idxOOBErrLabel = "idxOOBErrLabel " + genNonce();
+        String loadArrayElementEndLabel = "loadArrayElementEndLabel " + genNonce();
+        instr(new Cmp(new ModRMSIB(Reg64.RCX, true), 0));
+        addUnresolved(instr(new CondJmp(Condition.LT, 0, 0, false)), idxOOBErrLabel);
+        instr(new Cmp(new ModRMSIB(Reg64.RCX, Reg64.RDX)));
+        addUnresolved(instr(new CondJmp(Condition.GTE, 0, 0, false)), idxOOBErrLabel);
         instr(new Lea(new ModRMSIB(reg, Reg64.RCX, 8, 8, reg)));
+        addUnresolved(instr(new Jmp(0, 0, false)), loadArrayElementEndLabel);
+        addLabel(idxOOBErrLabel);
+        directPrint("Index out of bounds\n");
+        instr(new Mov_ri64(Reg64.RDI, -1));
+        addExit();
+        addLabel(loadArrayElementEndLabel);
     }
 
     @Override
@@ -872,6 +888,33 @@ public class Codifier implements Visitor<Object, Object> {
         return null;
     }
 
+    private void directPrint(String s) {
+        char[] chars = new char[s.length() + ((s.length() + 7) & 0b111)];
+        s.getChars(0, s.length(), chars, 0);
+        System.out.println(s.length());
+        instr(new Push(Reg64.RAX));
+        instr(new Push(Reg64.RDX));
+        instr(new Push(Reg64.RSI));
+        instr(new Push(Reg64.RDI));
+        long v = 0;
+        for (int i = chars.length-1; i >= 0; --i) {
+            v = (v << 8) | ((int)chars[i]);
+            if ((i & 0b111) == 0) {
+                instr(new Mov_ri64(Reg64.RDX, v));
+                instr(new Push(Reg64.RDX));
+                v = 0;
+            }
+        }
+        instr(new Mov_rmr(new ModRMSIB(Reg64.RSI, Reg64.RSP)));
+        instr(new Mov_ri64(Reg64.RDX, chars.length));
+        addPrintln();
+        instr(new Lea(new ModRMSIB(Reg64.RSP, chars.length, Reg64.RSP)));
+        instr(new Pop(Reg64.RDI));
+        instr(new Pop(Reg64.RSI));
+        instr(new Pop(Reg64.RDX));
+        instr(new Pop(Reg64.RAX));
+    }
+
     @Override
     public Object visitCastExpr(CastExpr expr, Object arg) {
         expr.asmOffset = asm.getSize();
@@ -880,23 +923,22 @@ public class Codifier implements Visitor<Object, Object> {
 
         // perform cast on value in RAX
         if (expr.resultType instanceof ClassType) {
+            // dynamic class cast
             loadVmtAddr(Reg64.RCX, expr.typeDecl);
             instr(new Mov_rmr(new ModRMSIB(Reg64.RBX, Reg64.RAX)));
             addInstanceOf(Reg64.RBX, Reg64.RCX, Reg64.RDX);
             instr(new Cmp(new ModRMSIB(Reg64.RDX, true), 1));
             String skipExitLabel = "skipExitLabel " + genNonce();
             addUnresolved(instr(new CondJmp(Condition.E, 0, 0, false)), skipExitLabel);
-            instr(new Mov_ri64(Reg64.RDX, 17));
-            instr(new Push(0x0000000A));
-            instr(new Push(0x52524520));
-            instr(new Push(0x54534143));
-            instr(new Mov_rmr(new ModRMSIB(Reg64.RSI, Reg64.RSP)));
+            directPrint(String.format("Invalid dynamic cast to instance of %s\n", ((ClassType)expr.resultType).className.spelling));
             addPrintln();
+            instr(new Mov_ri64(Reg64.RDI, -1));
             addExit();
             addLabel(skipExitLabel);
             instr(new Push(Reg64.RAX));
             return null;
         }
+        // base type cast
         int intSizeDst = 0;
         int intSizeSrc = 0;
         boolean isDbl = false;

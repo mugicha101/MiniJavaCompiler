@@ -20,6 +20,7 @@ class MainClass {
         pass(ab instanceof A); // prints pass - is true
         pass(ab instanceof B); // prints pass - is true
         pass(!(aa instanceof B)); // prints pass - is false
+        B afo = (B)aa;
         B bb = (B)ab; // explicit type cast
         aa.foo(); // prints A - normal method
         ab.foo(); // prints B - virtual method
@@ -37,7 +38,6 @@ class MainClass {
 }
 
 class A {
-    public char val;
     public static int x;
     public static void st() {
         System.out.println('S');
@@ -63,7 +63,6 @@ class A {
 }
 
 class B extends A {
-    public static int y;
     public static void st() {
         System.out.println('S');
         System.out.println('2');
