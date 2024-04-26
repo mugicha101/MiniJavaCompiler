@@ -20,7 +20,6 @@ class MainClass {
         pass(ab instanceof A); // prints pass - is true
         pass(ab instanceof B); // prints pass - is true
         pass(!(aa instanceof B)); // prints pass - is false
-        B afo = (B)aa;
         B bb = (B)ab; // explicit type cast
         aa.foo(); // prints A - normal method
         ab.foo(); // prints B - virtual method
@@ -34,6 +33,7 @@ class MainClass {
         A.tt(); // prints T - normal static method
         B.tt(); // prints T - inherited static method
         bb.b(); // prints a \newline b - b() calls super.a() then prints 'b'
+        NumPrint.printx(aa.hashCode());
     }
 }
 

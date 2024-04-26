@@ -71,6 +71,10 @@ public class Matcher implements Visitor<IdTable, Object> {
         // Object
         {
             objectClassDecl = new ClassDecl("Object", new FieldDeclList(), new MethodDeclList(), PREDEF_POSN);
+            MethodDecl objAddressDecl = new MethodDecl(new FieldDecl(false, false, new BaseType(TypeKind.LONG, PREDEF_POSN), "hashCode", PREDEF_POSN), new ParameterDeclList(), new StatementList(), PREDEF_POSN);
+            objAddressDecl.specialTag = "Object.hashCode";
+            objAddressDecl.statementList.add(new ReturnStmt(new LiteralExpr(new IntLiteral(new Token(TokenType.IntLiteral, "0", -1, -1)), PREDEF_POSN), PREDEF_POSN));
+            objectClassDecl.methodDeclList.add(objAddressDecl);
             prog.classDeclList.add(objectClassDecl);
         }
         // System.out.println

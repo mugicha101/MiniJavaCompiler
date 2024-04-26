@@ -94,7 +94,7 @@ public class Codifier implements Visitor<Object, Object> {
     // prints address stored in R15
     // calls NumPrint.print(val,16) directly
     private void debugPrint() {
-        if (true || printAddrDecl == null) return;
+        if (printAddrDecl == null) return;
         instr(new Push(Reg64.RAX));
         instr(new Push(Reg64.RCX));
         instr(new Push(Reg64.RDX));
@@ -294,13 +294,15 @@ public class Codifier implements Visitor<Object, Object> {
             instr(new Mov_rmr(new ModRMSIB(Reg64.RAX, 0, Reg64.RCX)));
             instr(new Mov_rrm(new ModRMSIB(Reg64.RCX, 0, Reg64.R15)));
 
-            // add debug print 727
+            // debug print
+            /*
             instr(new Mov_ri64(Reg64.R15, 0x727));
             debugPrint();
             loadStackBase(Reg64.R15);
             debugPrint();
             loadTextBase(Reg64.R15);
             debugPrint();
+             */
 
             // add call to main (copy arg passed into main to top of stack)
             loadStackBase(Reg64.RAX);
@@ -486,6 +488,8 @@ public class Codifier implements Visitor<Object, Object> {
                 instr(new Lea(new ModRMSIB(Reg64.RBP, memOffset, Reg64.RSI)));
                 instr(new Mov_rmi(new ModRMSIB(Reg64.RDX, true), 1));
                 addPrintln();
+            } else if (md.specialTag.equals("Object.hashCode")) {
+                instr(new Mov_rrm(new ModRMSIB(Reg64.RBP, thisMemOffset, Reg64.RAX)));
             }
         } else {
             for (Statement stmt : md.statementList) {
@@ -499,6 +503,7 @@ public class Codifier implements Visitor<Object, Object> {
         instr(new Mov_rmr(new ModRMSIB(Reg64.RSP, Reg64.RBP))); // mov rsp,rbp (pop all local variables)
         instr(new Pop(Reg64.RBP)); // pop rbp
 
+        // return value in RAX (if any)
         instr(new Ret());
         return null;
     }
